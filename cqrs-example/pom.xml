@@ -1,21 +1,21 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.xebia.cqrs</groupId>
-	<artifactId>cqrs-training-example</artifactId>
+	<artifactId>cqrs-example</artifactId>
 	<packaging>war</packaging>
 	<version>1.0-SNAPSHOT</version>
 	<name>Xebia - CQRS Example</name>
 
 	<parent>
 		<groupId>com.xebia.cqrs</groupId>
-		<artifactId>cqrs-training-parent</artifactId>
+		<artifactId>cqrs-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 
 	<dependencies>
 		<dependency>
 			<groupId>com.xebia.cqrs</groupId>
-			<artifactId>cqrs-training-framework</artifactId>
+			<artifactId>cqrs-framework</artifactId>
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
@@ -99,7 +99,7 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-aop</artifactId>
-			<version>2.5.6</version>
+			<version>2.5.6.SEC01</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
