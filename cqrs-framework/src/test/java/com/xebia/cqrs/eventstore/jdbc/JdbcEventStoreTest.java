@@ -3,6 +3,7 @@ package com.xebia.cqrs.eventstore.jdbc;
 import static org.junit.Assert.*;
 
 import java.sql.Driver;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,11 +21,13 @@ import com.xebia.cqrs.eventstore.EventSource;
 
 public class JdbcEventStoreTest {
     
-    private static final VersionedId TEST_ID = VersionedId.random();
+    private static final VersionedId INITIAL_ID = VersionedId.random();
+    private static final VersionedId LATEST_ID = VersionedId.forLatestVersion(INITIAL_ID.getId());
+    
     private SimpleJdbcTemplate jdbcTemplate;
     private JdbcEventStore<String> subject;
     
-    private EventSource<String> eventSource = new FakeEventSource(TEST_ID);
+    private EventSource<String> eventSource = new FakeEventSource(INITIAL_ID);
     
     private EventSerializer<String> eventSerializer = new EventSerializer<String>() {
 
@@ -47,21 +50,38 @@ public class JdbcEventStoreTest {
     @Test
     public void shouldSaveEvents() {
         subject.storeEventSource(eventSource);
-        FakeEventSource result = subject.loadEventSource(FakeEventSource.class, TEST_ID);
+        FakeEventSource result = subject.loadEventSource(FakeEventSource.class, LATEST_ID);
         
         assertEquals(1, jdbcTemplate.queryForInt("select count(*) from event_source"));
-        assertEquals(0, jdbcTemplate.queryForInt("select version from event_source where id = ?", TEST_ID.getId()));
-        assertEquals(2, jdbcTemplate.queryForInt("select next_event_sequence_number from event_source where id = ?", TEST_ID.getId()));
+        assertEquals(0, jdbcTemplate.queryForInt("select version from event_source where id = ?", INITIAL_ID.getId()));
+        assertEquals(2, jdbcTemplate.queryForInt("select next_event_sequence_number from event_source where id = ?", INITIAL_ID.getId()));
         assertEquals(2, jdbcTemplate.queryForInt("select count(*) from event"));
         
         assertEquals(Arrays.asList("foo", "bar"), result.getLoadedHistory());
     }
     
     @Test
+    public void shouldIgnoreEventSourceWithoutUnsavedEventsOnSave() {
+        eventSource.clearUnsavedEvents();
+        
+        subject.storeEventSource(eventSource);
+        
+        assertEquals(INITIAL_ID, eventSource.getVersionedId());
+    }
+    
+    @Test
+    public void shouldClearUnsavedEventsAndIncrementVersionOnSave() {
+        subject.storeEventSource(eventSource);
+        
+        assertEquals(INITIAL_ID.nextVersion(), eventSource.getVersionedId());
+        assertTrue(eventSource.getUnsavedEvents().isEmpty());
+    }
+    
+    @Test
     public void shouldThrowConcurrencyExceptionOnVersionMismatch() {
         try {
             subject.storeEventSource(eventSource);
-            subject.loadEventSource(FakeEventSource.class, TEST_ID.withVersion(4));
+            subject.loadEventSource(FakeEventSource.class, INITIAL_ID.withVersion(4));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
@@ -74,11 +94,14 @@ public class JdbcEventStoreTest {
 
     private static class FakeEventSource implements EventSource<String> {
 
-        private final VersionedId id;
+        private VersionedId id;
         private Iterable<? extends String> history;
+        private List<String> unsavedEvents  = new ArrayList<String>();
 
         public FakeEventSource(VersionedId id) {
             this.id = id;
+            unsavedEvents.add("foo");
+            unsavedEvents.add("bar");
         }
         
         public VersionedId getVersionedId() {
@@ -89,10 +112,18 @@ public class JdbcEventStoreTest {
             return history;
         }
 
+        public void incrementVersion() {
+            id = id.nextVersion();
+        }
+        
         public List<String> getUnsavedEvents() {
-            return Arrays.asList("foo", "bar");
+            return unsavedEvents;
         }
 
+        public void clearUnsavedEvents() {
+            unsavedEvents.clear();
+        }
+        
         public void loadFromHistory(Iterable<? extends String> history) {
             this.history = history;
         }

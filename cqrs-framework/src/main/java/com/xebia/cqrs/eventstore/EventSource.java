@@ -27,5 +27,9 @@ public interface EventSource<T> {
      * The unsaved events for this event source.
      */
     List<? extends T> getUnsavedEvents();
+    
+    void clearUnsavedEvents();
+    
+    void incrementVersion();
 
 }

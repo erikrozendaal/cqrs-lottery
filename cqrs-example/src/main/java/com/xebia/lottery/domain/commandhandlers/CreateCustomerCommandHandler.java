@@ -24,9 +24,7 @@ public class CreateCustomerCommandHandler extends AbstractHandler<CreateCustomer
 
     public void handleMessage(CreateCustomerCommand message) {
         Customer customer = customerFactory.create(message.getCustomerId(), message.getInfo(), message.getInitialAccountBalance());
-        if (customer != null) {
-            repository.save(customer);
-        }
+        repository.add(customer);
     }
 
 }

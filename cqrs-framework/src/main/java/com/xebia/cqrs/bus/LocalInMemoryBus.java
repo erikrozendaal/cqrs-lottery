@@ -1,6 +1,7 @@
 package com.xebia.cqrs.bus;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -23,6 +24,7 @@ public class LocalInMemoryBus implements Bus {
     
     private static final Logger LOG = Logger.getLogger(LocalInMemoryBus.class);
     
+    private final Collection<BusSynchronization> synchronizations = new ArrayList<BusSynchronization>();
     private final Multimap<Class<?>, Handler<?>> handlers = HashMultimap.create();
 
     private final ThreadLocal<Queue<Object>> eventQueue = new ThreadLocal<Queue<Object>>() {
@@ -91,6 +93,12 @@ public class LocalInMemoryBus implements Bus {
         }
     }
     
+    @Autowired
+    public void setBusSynchronizations(BusSynchronization... synchronizations) {
+        this.synchronizations.clear();
+        this.synchronizations.addAll(Arrays.asList(synchronizations));
+    }
+    
     private void dispatchAllQueuedMessages() {
         try {
             while (!eventQueue.get().isEmpty()) {
@@ -107,10 +115,24 @@ public class LocalInMemoryBus implements Bus {
         CurrentMessageInformation savedState = state.get();
         try {
             state.set(new CurrentMessageInformation(message)); 
+            invokeBeforeHandleMessage();
             invokeHandlers(message);
+            invokeAfterHandleMessage();
             return state.get().responses;
         } finally {
             state.set(savedState);
+        }
+    }
+
+    private void invokeBeforeHandleMessage() {
+        for (BusSynchronization synchronization : synchronizations) {
+            synchronization.beforeHandleMessage();
+        }
+    }
+
+    private void invokeAfterHandleMessage() {
+        for (BusSynchronization synchronization : synchronizations) {
+            synchronization.afterHandleMessage();
         }
     }
 

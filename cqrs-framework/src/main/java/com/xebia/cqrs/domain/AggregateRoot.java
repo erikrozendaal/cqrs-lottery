@@ -9,7 +9,7 @@ import com.xebia.cqrs.eventstore.EventSource;
 
 public abstract class AggregateRoot implements EventSource<Event> {
 
-    private final VersionedId id;
+    private VersionedId id;
     private final List<Event> unsavedEvents;
     private final List<Notification> notifications;
     
@@ -21,12 +21,12 @@ public abstract class AggregateRoot implements EventSource<Event> {
     
     protected abstract void onEvent(Event event);
 
-    protected final void apply(Event event) {
+    protected void apply(Event event) {
         onEvent(event);
         unsavedEvents.add(event);
     }
 
-    protected final void notify(Notification notification) {
+    protected void notify(Notification notification) {
         Validate.notNull(notification, "notification is required");
         notifications.add(notification);
     }
@@ -47,6 +47,10 @@ public abstract class AggregateRoot implements EventSource<Event> {
     
     public void clearUnsavedEvents() {
         unsavedEvents.clear();
+    }
+    
+    public void incrementVersion() {
+        id = id.nextVersion();
     }
 
     public List<Notification> getNotifications() {

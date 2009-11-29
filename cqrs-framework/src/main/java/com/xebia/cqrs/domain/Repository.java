@@ -5,6 +5,6 @@ public interface Repository {
 
     < T extends AggregateRoot> T get(Class<T> type, VersionedId id);
     
-    <T extends AggregateRoot> void save(T aggregate);
+    <T extends AggregateRoot> void add(T aggregate);
     
 }

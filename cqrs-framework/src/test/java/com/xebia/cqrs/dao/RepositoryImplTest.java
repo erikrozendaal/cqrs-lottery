@@ -6,6 +6,7 @@ import static org.junit.Assert.*;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import com.xebia.cqrs.bus.Bus;
 import com.xebia.cqrs.domain.AggregateRootNotFoundException;
@@ -18,7 +19,7 @@ import com.xebia.cqrs.eventstore.EventStore;
 
 public class RepositoryImplTest {
 
-    private static final VersionedId TEST_ID = VersionedId.random();
+    private static final VersionedId TEST_ID = VersionedId.random().withVersion(2);
     
     private Bus bus;
     private FakeAggregateRoot aggregateRoot;
@@ -28,7 +29,7 @@ public class RepositoryImplTest {
     @SuppressWarnings("unchecked")
     @Before
     public void setUp() {
-        aggregateRoot = new FakeAggregateRoot(TEST_ID.withVersion(2));
+        aggregateRoot = new FakeAggregateRoot(TEST_ID.nextVersion());
         aggregateRoot.loadFromHistory(asList(
                 new GreetingEvent(TEST_ID, "Hi Erik"),
                 new GreetingEvent(TEST_ID, "Hi Sjors")));
@@ -64,16 +65,44 @@ public class RepositoryImplTest {
     }
     
     @Test
-    public void shouldStoreAndClearUnsavedEvents() {
+    public void shouldLoadAggregateOnlyOnce() {
+        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
+        replay(eventStore);
+        
+        FakeAggregateRoot a = subject.get(FakeAggregateRoot.class, TEST_ID);
+        FakeAggregateRoot b = subject.get(FakeAggregateRoot.class, TEST_ID);
+
+        verify(eventStore);
+        assertSame(a, b);
+    }
+    
+    @Test
+    public void shouldCheckAggregateVersionOnLoadFromSession() {
+        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
+        eventStore.verifyVersion(aggregateRoot, TEST_ID.withVersion(0)); expectLastCall().andThrow(new OptimisticLockingFailureException("error"));
+        replay(eventStore);
+        
+        subject.get(FakeAggregateRoot.class, TEST_ID);
+        try {
+            subject.get(FakeAggregateRoot.class, TEST_ID.withVersion(0));
+            fail("OptimisticLockingFailureException expected");
+        } catch (OptimisticLockingFailureException expected) {
+        }
+        
+        verify(eventStore);
+    }
+    
+    @Test
+    public void shouldStoreAggregate() {
         aggregateRoot.greetPerson("Erik");
 
         eventStore.storeEventSource(same(aggregateRoot)); expectLastCall();
         replay(eventStore, bus);
         
-        subject.save(aggregateRoot);
+        subject.add(aggregateRoot);
+        subject.afterHandleMessage();
         
         verify(eventStore, bus);
-        assertTrue(aggregateRoot.getUnsavedEvents().isEmpty());
     }
     
     @Test
@@ -83,7 +112,8 @@ public class RepositoryImplTest {
         bus.publish(eq(aggregateRoot.getUnsavedEvents())); expectLastCall();
         replay(eventStore, bus);
         
-        subject.save(aggregateRoot);
+        subject.add(aggregateRoot);
+        subject.afterHandleMessage();
         
         verify(eventStore, bus);
     }
@@ -95,7 +125,8 @@ public class RepositoryImplTest {
         bus.reply(eq(aggregateRoot.getNotifications())); expectLastCall();
         replay(eventStore, bus);
         
-        subject.save(aggregateRoot);
+        subject.add(aggregateRoot);
+        subject.afterHandleMessage();
         
         verify(eventStore, bus);
     }

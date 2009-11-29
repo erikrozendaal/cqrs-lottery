@@ -19,7 +19,7 @@ public class CreateLotteryCommandHandler extends AbstractHandler<CreateLotteryCo
 
     public void handleMessage(CreateLotteryCommand message) {
         Lottery lottery = new Lottery(message.getLotteryId(), message.getInfo());
-        repository.save(lottery);
+        repository.add(lottery);
     }
 
 }

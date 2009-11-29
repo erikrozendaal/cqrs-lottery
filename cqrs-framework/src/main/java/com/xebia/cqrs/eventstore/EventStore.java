@@ -10,6 +10,11 @@ import com.xebia.cqrs.domain.VersionedId;
 public interface EventStore<E> {
 
     /**
+     * Checks the version of the {@link EventSource} against the expected version.
+     */
+    void verifyVersion(EventSource<?> source, VersionedId expectedId) throws ConcurrencyFailureException;
+    
+    /**
      * Saves the changes for the specified {@link EventSource}.
      */
     void storeEventSource(EventSource<? extends E> source) throws ConcurrencyFailureException;

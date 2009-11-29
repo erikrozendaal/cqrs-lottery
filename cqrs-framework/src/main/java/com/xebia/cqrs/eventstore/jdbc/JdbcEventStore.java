@@ -12,6 +12,7 @@ import javax.annotation.PostConstruct;
 
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -40,6 +41,13 @@ public class JdbcEventStore<E> implements EventStore<E> {
         this.eventSerializer = eventSerializer;
     }
     
+    public void verifyVersion(EventSource<?> source, VersionedId expectedId) throws ConcurrencyFailureException {
+        if (!expectedId.nextVersion().isCompatible(source.getVersionedId())) {
+            String msg = "concurrent modification of event source id '" + source.getVersionedId().getId() + "', type '" + source.getClass().getName() + "'. Actual: " + source.getVersionedId().getVersion() + ", expected: " + expectedId.nextVersion().getVersion();
+            throw new OptimisticLockingFailureException(msg);
+        }
+    }
+    
     public void storeEventSource(EventSource<? extends E> source) {
         List<? extends E> unsavedEvents = source.getUnsavedEvents();
         if (unsavedEvents.isEmpty()) {
@@ -51,6 +59,8 @@ public class JdbcEventStore<E> implements EventStore<E> {
         } else {
             updateEventSource(source, unsavedEvents);
         }
+        source.clearUnsavedEvents();
+        source.incrementVersion();
     }
 
     private void insertEventSource(EventSource<? extends E> source, List<? extends E> unsavedEvents) {
@@ -107,21 +117,15 @@ public class JdbcEventStore<E> implements EventStore<E> {
     public <T extends EventSource<? super E>> T loadEventSource(Class<T> type, VersionedId eventSourceId) {
         try {
             JdbcEventSourceRow eventSourceRow = loadEventSourceRow(eventSourceId);
-            verifyVersion(eventSourceId.getVersion(), eventSourceRow);
             List<E> history = loadEvents(eventSourceId.getId());
             T result = instantiateEventSource(type, eventSourceRow, history);
+            verifyVersion(result, eventSourceId);
             return result;
         } catch (EmptyResultDataAccessException ex) {
             return null;
         }
     }
 
-    private <T extends EventSource<?>> void verifyVersion(long version, JdbcEventSourceRow eventSourceRow) {
-        if (version != eventSourceRow.getVersion()) {
-            throwConcurrentModificationFailureException(eventSourceRow, eventSourceRow.getVersion(), version);
-        }
-    }
-    
     private List<E> loadEvents(Object eventSourceId) {
         return jdbcTemplate.query("select data from event where event_source_id = ? order by sequence_number", new JdbcEventDeserializerRowMapper(), eventSourceId);
     }
