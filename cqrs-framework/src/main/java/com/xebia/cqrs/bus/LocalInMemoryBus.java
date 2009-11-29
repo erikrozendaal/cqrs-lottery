@@ -42,17 +42,9 @@ public class LocalInMemoryBus implements Bus {
     }
     
     public Response sendAndWaitForResponse(Object command) {
-        List<Response> responses = dispatchMessage(command);
-        if (responses.isEmpty()) {
-            throw new MessageHandlingException("no response while executing command " + command);
-        }
-
+        List<Object> responses = dispatchMessage(command);
         dispatchAllQueuedMessages();
-
-        if (LOG.isDebugEnabled() && responses.size() > 1) {
-            LOG.debug("additional responses ignored: " + responses.subList(1, responses.size()));
-        }
-        return responses.get(0);
+        return new Response(responses);
     }
 
     public void reply(Object message) {
@@ -102,7 +94,7 @@ public class LocalInMemoryBus implements Bus {
         }
     }
 
-    private List<Response> dispatchMessage(Object message) {
+    private List<Object> dispatchMessage(Object message) {
         Validate.notNull(message, "message is required");
         CurrentMessageInformation savedState = state.get();
         try {
@@ -135,14 +127,14 @@ public class LocalInMemoryBus implements Bus {
 
     private static class CurrentMessageInformation {
         public Object currentMessage;
-        public List<Response> responses = new ArrayList<Response>();
+        public List<Object> responses = new ArrayList<Object>();
         
         public CurrentMessageInformation(Object currentMessage) {
             this.currentMessage = currentMessage;
         }
 
         void addReplies(Iterable<?> messages) {
-            responses.add(new Response(messages));
+            Iterables.addAll(responses, messages);
         }
     }
 

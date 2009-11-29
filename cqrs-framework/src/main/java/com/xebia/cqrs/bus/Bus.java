@@ -2,16 +2,23 @@ package com.xebia.cqrs.bus;
 
 public interface Bus {
 
-    void send(Object message) throws MessageHandlingException;
-    
     /**
-     * Sends a message to all registered handlers and returns the <em>first</em>
-     * response.
+     * Send a message to all registered handlers.
      * 
-     * @return the first response.
+     * @param message
+     *            the message to send.
+     * @throws MessageHandlingException
+     *             an error occurred during message processing.
+     */
+    void send(Object message) throws MessageHandlingException;
+
+    /**
+     * Sends a message to all registered handlers and returns response.
+     * 
+     * @return the response containing a (possibly empty) list of replied
+     *         messages.
      * @exception MessageHandlingException
-     *                an error occurred during message processing or no response
-     *                was returned.
+     *                an error occurred during message processing.
      */
     Response sendAndWaitForResponse(Object message) throws MessageHandlingException;
 
