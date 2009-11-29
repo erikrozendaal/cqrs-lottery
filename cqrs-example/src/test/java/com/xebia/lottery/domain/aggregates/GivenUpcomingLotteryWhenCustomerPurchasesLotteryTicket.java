@@ -2,6 +2,7 @@ package com.xebia.lottery.domain.aggregates;
 
 import static java.util.Arrays.*;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.xebia.cqrs.domain.VersionedId;
@@ -41,6 +42,7 @@ public class GivenUpcomingLotteryWhenCustomerPurchasesLotteryTicket extends BddT
         lottery.purchaseTicketForCustomer(customer);
     }
     
+    @Ignore
     @Test
     public void shouldRaiseTicketPurchasedEvent() {
         assertChange(
@@ -48,6 +50,7 @@ public class GivenUpcomingLotteryWhenCustomerPurchasesLotteryTicket extends BddT
                 new LotteryTicketPurchasedEvent(LOTTERY_ID, CUSTOMER_ID, "431130"));
     }
     
+    @Ignore
     @Test
     public void shouldDeductTicketPriceFromCustomerBalance() {
         assertChange(
