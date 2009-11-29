@@ -1,4 +1,10 @@
-# Run mvn clean install
-# Go to the cqrs-example subdirectory
-# Run mvn jetty:run
-# Go to http://localhost:8080/lottery/lotteries
+To start with the exercise do:
+
+- Checkout: "git clone -b exercise git@github.com:erikrozendaal/cqrs-lottery.git"
+- Run "mvn clean install" in the cqrs-lottery directory
+- Go to the cqrs-example subdirectory
+- Run "mvn jetty:run"
+- Go to http://localhost:8080/lottery/lotteries
+- Create a lottery
+- Create a customer... this will break. Fix it!
+- Purchases a ticket... this will break. Fix it!
