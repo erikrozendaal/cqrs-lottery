@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.util.Date;
 import java.util.List;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ public class JdbcLotteryQueryServiceTest {
         assertEquals(new LotteryInfoQueryResult(LOTTERY_ID, LOTTERY_INFO), lottery);
     }
 
+    @Ignore
     @Test
     public void findCustomers() {
         assertTrue(lotteryQueryService.findCustomers().isEmpty());

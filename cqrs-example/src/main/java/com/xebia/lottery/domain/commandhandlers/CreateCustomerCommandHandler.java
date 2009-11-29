@@ -1,5 +1,6 @@
 package com.xebia.lottery.domain.commandhandlers;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -23,10 +24,8 @@ public class CreateCustomerCommandHandler extends AbstractHandler<CreateCustomer
     }
 
     public void handleMessage(CreateCustomerCommand message) {
-        Customer customer = customerFactory.create(message.getCustomerId(), message.getInfo(), message.getInitialAccountBalance());
-        if (customer != null) {
-            repository.save(customer);
-        }
+        // Create the customer and save it into the event store using the repository here
+        throw new NotImplementedException("handle create customer command here");
     }
 
 }

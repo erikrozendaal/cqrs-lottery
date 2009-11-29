@@ -1,5 +1,6 @@
 package com.xebia.lottery.reporting.eventhandlers;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.SimpleJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -19,17 +20,18 @@ public class CustomerCreatedEventHandler extends AbstractHandler<CustomerCreated
     }
 
     public void handleMessage(CustomerCreatedEvent message) {
-        CustomerInfo info = message.getInfo();
-        simpleJdbcTemplate.update("insert into customer(id, version, name, account_balance, email, street_name, house_number, postal_code, city, country) values (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)", 
-                message.getCustomerId().getId(), 
-                message.getCustomerId().getVersion(), 
-                info.getName(), 
-                info.getEmail(), 
-                info.getAddress().getStreetName(),
-                info.getAddress().getHouseNumber(),
-                info.getAddress().getPostalCode(),
-                info.getAddress().getCity(),
-                info.getAddress().getCountry());
+        throw new NotImplementedException("update the reporting database here");
+//        CustomerInfo info = message.getInfo();
+//        simpleJdbcTemplate.update("insert into customer(id, version, name, account_balance, email, street_name, house_number, postal_code, city, country) values (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)", 
+//                message.getCustomerId().getId(), 
+//                message.getCustomerId().getVersion(), 
+//                info.getName(), 
+//                info.getEmail(), 
+//                info.getAddress().getStreetName(),
+//                info.getAddress().getHouseNumber(),
+//                info.getAddress().getPostalCode(),
+//                info.getAddress().getCity(),
+//                info.getAddress().getCountry());
     }
 
 }
