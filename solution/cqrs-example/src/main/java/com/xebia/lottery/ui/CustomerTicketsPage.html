@@ -1,0 +1,20 @@
+<html xmlns:wicket="http://wicket.apache.org/dtds.data/wicket-xhtml1.4-strict.dtd" >
+    <head>  
+        <title>Xebia Lottery - Create customer</title>
+    </head>
+    <body>
+    	<wicket:extend>
+    		<h2>Tickets for <span wicket:id="customerName">Jan Jansen</span></h2>
+			<table class="listing">
+				<tr>
+					<th class="listing">Lottery</th>
+					<th class="listing">Number</th>
+				</tr>
+				<tr wicket:id="tickets">
+					<td class="listing"><span wicket:id="lotteryName">Xebia</span></td>
+					<td class="listing"><span wicket:id="number">1234</span></td>
+				</tr>
+			</table>
+		</wicket:extend>
+    </body>
+</html>
