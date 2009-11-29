@@ -1,0 +1,4 @@
+# Run mvn clean install
+# Go to the cqrs-example subdirectory
+# Run mvn jetty:run
+# Go to http://localhost:8080/lottery/lotteries
