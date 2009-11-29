@@ -77,6 +77,19 @@ public class RepositoryImplTest {
     }
     
     @Test
+    public void shouldRejectDifferentAggregatesWithSameId() {
+        FakeAggregateRoot a = new FakeAggregateRoot(TEST_ID);
+        FakeAggregateRoot b = new FakeAggregateRoot(TEST_ID);
+        
+        subject.add(a);
+        try {
+            subject.add(b);
+            fail("IllegalStateException expected");
+        } catch (IllegalStateException expected) {
+        }
+    }
+    
+    @Test
     public void shouldCheckAggregateVersionOnLoadFromSession() {
         expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
         eventStore.verifyVersion(aggregateRoot, TEST_ID.withVersion(0)); expectLastCall().andThrow(new OptimisticLockingFailureException("error"));
@@ -93,13 +106,27 @@ public class RepositoryImplTest {
     }
     
     @Test
-    public void shouldStoreAggregate() {
+    public void shouldStoreAddedAggregate() {
         aggregateRoot.greetPerson("Erik");
 
         eventStore.storeEventSource(same(aggregateRoot)); expectLastCall();
         replay(eventStore, bus);
         
         subject.add(aggregateRoot);
+        subject.afterHandleMessage();
+        
+        verify(eventStore, bus);
+    }
+    
+    @Test
+    public void shouldStoreLoadedAggregate() {
+        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
+        eventStore.storeEventSource(same(aggregateRoot)); expectLastCall();
+        replay(eventStore, bus);
+
+        FakeAggregateRoot result = subject.get(FakeAggregateRoot.class, TEST_ID);
+        result.greetPerson("Erik");
+
         subject.afterHandleMessage();
         
         verify(eventStore, bus);

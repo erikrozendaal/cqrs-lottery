@@ -22,11 +22,8 @@ import com.xebia.cqrs.eventstore.EventStore;
 @org.springframework.stereotype.Repository
 public class RepositoryImpl implements Repository, BusSynchronization {
 
-    @Autowired
-    private EventStore<Event> eventStore;
-    
-    @Autowired
-    private Bus bus;
+    private final EventStore<Event> eventStore;
+    private final Bus bus;
 
     private final ThreadLocal<Session> sessions = new ThreadLocal<Session>() {
         @Override
@@ -35,9 +32,7 @@ public class RepositoryImpl implements Repository, BusSynchronization {
         }
     };
     
-    public RepositoryImpl() {
-    }
-    
+    @Autowired
     public RepositoryImpl(EventStore<Event> eventStore, Bus bus) {
         this.eventStore = eventStore;
         this.bus = bus;
@@ -78,18 +73,21 @@ public class RepositoryImpl implements Repository, BusSynchronization {
             return result;
         }
 
+        public <T extends AggregateRoot> void add(T aggregate) {
+            addToSession(aggregate);
+        }
+
         private void verifyExistence(Class<?> type, VersionedId id, Object result) {
             if (result == null) {
                 throw new AggregateRootNotFoundException(type.getName(), id.getId());
             }
         }
 
-        public <T extends AggregateRoot> void add(T aggregate) {
-            addToSession(aggregate);
-        }
-
         private <T extends AggregateRoot> void addToSession(T aggregate) {
-            aggregatesById.put(aggregate.getVersionedId().getId(), aggregate);
+            AggregateRoot previous = aggregatesById.put(aggregate.getVersionedId().getId(), aggregate);
+            if (previous != null && previous != aggregate) {
+                throw new IllegalStateException("multiple instances with same id " + aggregate.getVersionedId().getId());
+            }
             unsavedAggregates.add(aggregate);
         }
 
@@ -108,7 +106,7 @@ public class RepositoryImpl implements Repository, BusSynchronization {
             }
             bus.reply(notifications);
             
-            aggregatesById.clear();
+            aggregatesById.clear(); // should be done just before transaction commit...
             unsavedAggregates.clear();
         }
 
