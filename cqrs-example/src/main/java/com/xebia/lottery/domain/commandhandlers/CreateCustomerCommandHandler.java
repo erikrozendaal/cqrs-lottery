@@ -15,17 +15,18 @@ public class CreateCustomerCommandHandler extends AbstractHandler<CreateCustomer
 
     @Autowired
     private Repository repository;
-    
+
     @Autowired
     private CustomerFactory customerFactory;
-    
+
     public CreateCustomerCommandHandler() {
         super(CreateCustomerCommand.class);
     }
 
     public void handleMessage(CreateCustomerCommand message) {
-        // Create the customer and save it into the event store using the repository here
-        throw new NotImplementedException("handle create customer command here");
+        // Use the customer factory to create a customer
+        // Save the customer when successfully created
+        throw new NotImplementedException("create and save the customer to the repository here");
     }
 
 }

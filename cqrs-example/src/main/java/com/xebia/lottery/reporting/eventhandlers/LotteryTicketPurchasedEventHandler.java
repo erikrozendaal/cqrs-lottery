@@ -18,13 +18,13 @@ public class LotteryTicketPurchasedEventHandler extends AbstractHandler<LotteryT
     }
 
     public void handleMessage(LotteryTicketPurchasedEvent message) {
-        simpleJdbcTemplate.update("insert into ticket (number, lottery_id, customer_id) values (?, ?, ?)", 
-                message.getTicketNumber(), 
-                message.getAggregateRootId().getId(), 
-                message.getCustomerId().getId());
-        simpleJdbcTemplate.update("update lottery set version = ? where id = ?", 
-                message.getAggregateRootId().getVersion(), 
-                message.getAggregateRootId().getId());
+//        simpleJdbcTemplate.update("insert into ticket (number, lottery_id, customer_id) values (?, ?, ?)", 
+//                message.getTicketNumber(), 
+//                message.getAggregateRootId().getId(), 
+//                message.getCustomerId().getId());
+//        simpleJdbcTemplate.update("update lottery set version = ? where id = ?", 
+//                message.getAggregateRootId().getVersion(), 
+//                message.getAggregateRootId().getId());
     }
 
 }

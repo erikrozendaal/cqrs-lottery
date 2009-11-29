@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.commons.lang.NotImplementedException;
+
 import com.xebia.cqrs.domain.AggregateRoot;
 import com.xebia.cqrs.domain.Event;
 import com.xebia.cqrs.domain.VersionedId;
@@ -28,13 +30,8 @@ public class Lottery extends AggregateRoot {
     }
 
     public void purchaseTicketForCustomer(Customer customer) {
-        if (!customer.isBalanceSufficient(this.ticketPrice)) {
-            notify(new ValidationError("insufficient account balance to purchase ticket"));
-            return;
-        }
-        
-        customer.deductBalance(this.ticketPrice);
-        apply(new LotteryTicketPurchasedEvent(getVersionedId(), customer.getVersionedId(), generateTicketNumber()));
+        // Charge customer for ticket and ensure ticket is purchased
+        throw new NotImplementedException("charge customer and create ticket");
     }
 
     private String generateTicketNumber() {

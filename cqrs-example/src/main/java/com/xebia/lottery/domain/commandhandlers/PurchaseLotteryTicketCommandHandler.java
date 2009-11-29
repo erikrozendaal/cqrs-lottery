@@ -1,5 +1,6 @@
 package com.xebia.lottery.domain.commandhandlers;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -19,11 +20,8 @@ public class PurchaseLotteryTicketCommandHandler implements Handler<PurchaseTick
     }
 
     public void handleMessage(PurchaseTicketCommand command) {
-        Lottery lottery = repository.get(Lottery.class, command.getLotteryId());
-        Customer customer = repository.get(Customer.class, command.getCustomerId());
-        lottery.purchaseTicketForCustomer(customer);
-        repository.save(lottery);
-        repository.save(customer);
+        // Invoke lottery.purchaseTicketForCustomer etc...
+        throw new NotImplementedException("handle purchase ticket command here");
     }
 
 }
