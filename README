@@ -1,6 +1,6 @@
 To start with the exercise do:
 
-- Checkout: "git clone -b exercise git@github.com:erikrozendaal/cqrs-lottery.git"
+- Checkout: "git clone -b exercise git://github.com/erikrozendaal/cqrs-lottery.git"
 - Run "mvn clean install" in the cqrs-lottery directory
 - Go to the cqrs-example subdirectory
 - Run "mvn jetty:run"
