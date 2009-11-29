@@ -17,12 +17,18 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 
+/**
+ * Implements the {@link Bus} interface using a single, local transaction. This
+ * means that all handlers will be called within the same transaction and before
+ * the original {@link #send(Object)} or {@link #sendAndWaitForResponse(Object)}
+ * returns.
+ */
 @Service
 @Transactional
 public class LocalInMemoryBus implements Bus {
-    
+
     private static final Logger LOG = Logger.getLogger(LocalInMemoryBus.class);
-    
+
     private final Multimap<Class<?>, Handler<?>> handlers = HashMultimap.create();
 
     private final ThreadLocal<Queue<Object>> eventQueue = new ThreadLocal<Queue<Object>>() {
@@ -35,12 +41,12 @@ public class LocalInMemoryBus implements Bus {
             return new CurrentMessageInformation(null);
         }
     };
-    
+
     public void send(Object message) throws MessageHandlingException {
         dispatchMessage(message);
         dispatchAllQueuedMessages();
     }
-    
+
     public Response sendAndWaitForResponse(Object command) {
         List<Object> responses = dispatchMessage(command);
         dispatchAllQueuedMessages();
@@ -50,7 +56,7 @@ public class LocalInMemoryBus implements Bus {
     public void reply(Object message) {
         reply(Collections.singleton(message));
     }
-    
+
     public void reply(Iterable<?> messages) {
         if (getCurrentMessage() == null) {
             throw new MessageHandlingException("no current message to reply to");
@@ -82,7 +88,7 @@ public class LocalInMemoryBus implements Bus {
             handlers.put(handler.getMessageType(), handler);
         }
     }
-    
+
     private void dispatchAllQueuedMessages() {
         try {
             while (!eventQueue.get().isEmpty()) {
@@ -98,7 +104,7 @@ public class LocalInMemoryBus implements Bus {
         Validate.notNull(message, "message is required");
         CurrentMessageInformation savedState = state.get();
         try {
-            state.set(new CurrentMessageInformation(message)); 
+            state.set(new CurrentMessageInformation(message));
             invokeHandlers(message);
             return state.get().responses;
         } finally {
@@ -128,7 +134,7 @@ public class LocalInMemoryBus implements Bus {
     private static class CurrentMessageInformation {
         public Object currentMessage;
         public List<Object> responses = new ArrayList<Object>();
-        
+
         public CurrentMessageInformation(Object currentMessage) {
             this.currentMessage = currentMessage;
         }
