@@ -93,8 +93,7 @@ public class JdbcEventStore<E> implements EventStore<E> {
         EventStream stream = getEventStream(streamId);
         List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, stream.getVersion());
 
-        sink.setType(stream.getType());
-        sendEventsToSink(storedEvents, sink);
+        sendEventsToSink(stream, storedEvents, sink);
     }
 
     public void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
@@ -104,24 +103,21 @@ public class JdbcEventStore<E> implements EventStore<E> {
         }
         List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, stream.getVersion());
 
-        sink.setType(stream.getType());
-        sendEventsToSink(storedEvents, sink);
+        sendEventsToSink(stream, storedEvents, sink);
     }
 
     public void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) {
         EventStream stream = getEventStream(streamId);
         List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, version);
 
-        sink.setType(stream.getType());
-        sendEventsToSink(storedEvents, sink);
+        sendEventsToSink(stream, storedEvents, sink);
     }
 
     public void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
         EventStream stream = getEventStream(streamId);
         List<StoredEvent<E>> storedEvents = loadEventsUptoTimestamp(stream, timestamp);
 
-        sink.setType(stream.getType());
-        sendEventsToSink(storedEvents, sink);
+        sendEventsToSink(stream, storedEvents, sink);
     }
 
     private void saveEvents(UUID streamId, long version, long timestamp, int nextEventSequence, List<? extends E> events) {
@@ -164,12 +160,14 @@ public class JdbcEventStore<E> implements EventStore<E> {
         return storedEvents;
     }
 
-    private void sendEventsToSink(List<StoredEvent<E>> storedEvents, EventSink<E> sink) {
+    private void sendEventsToSink(EventStream stream, List<StoredEvent<E>> storedEvents, EventSink<E> sink) {
         List<E> events = new ArrayList<E>(storedEvents.size());
         for (StoredEvent<E> storedEvent : storedEvents) {
             events.add(storedEvent.getEvent());
         }
         StoredEvent<E> lastEvent = storedEvents.get(storedEvents.size() - 1);
+        
+        sink.setType(stream.getType());
         sink.setVersion(lastEvent.getVersion());
         sink.setTimestamp(lastEvent.getTimestamp());
         sink.setEvents(events);
