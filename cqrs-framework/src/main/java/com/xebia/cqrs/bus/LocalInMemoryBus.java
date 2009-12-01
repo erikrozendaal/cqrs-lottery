@@ -85,7 +85,7 @@ public class LocalInMemoryBus implements Bus {
         return state.get().currentMessage;
     }
 
-    @Autowired
+    @Autowired(required=false)
     public void setHandlers(Handler<?>... injectedHandlers) {
         handlers.clear();
         for (Handler<?> handler : injectedHandlers) {
@@ -93,7 +93,7 @@ public class LocalInMemoryBus implements Bus {
         }
     }
     
-    @Autowired
+    @Autowired(required=false)
     public void setBusSynchronizations(BusSynchronization... synchronizations) {
         this.synchronizations.clear();
         this.synchronizations.addAll(Arrays.asList(synchronizations));

@@ -1,9 +1,8 @@
 package com.xebia.cqrs.eventstore.jdbc;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -12,21 +11,18 @@ import javax.annotation.PostConstruct;
 
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.simple.ParameterizedRowMapper;
 import org.springframework.jdbc.core.simple.SimpleJdbcTemplate;
-import org.springframework.stereotype.Repository;
 
-import com.xebia.cqrs.domain.VersionedId;
 import com.xebia.cqrs.eventstore.EventSerializer;
+import com.xebia.cqrs.eventstore.EventSink;
 import com.xebia.cqrs.eventstore.EventSource;
 import com.xebia.cqrs.eventstore.EventStore;
 
-
-@Repository
 public class JdbcEventStore<E> implements EventStore<E> {
 
     private static final Logger LOG = Logger.getLogger(JdbcEventStore.class);
@@ -35,160 +31,238 @@ public class JdbcEventStore<E> implements EventStore<E> {
     
     private final EventSerializer<E> eventSerializer;
 
-    @Autowired 
+    @Autowired
     public JdbcEventStore(SimpleJdbcTemplate jdbcTemplate, EventSerializer<E> eventSerializer) {
         this.jdbcTemplate = jdbcTemplate;
         this.eventSerializer = eventSerializer;
-    }
-    
-    public void verifyVersion(EventSource<?> source, VersionedId expectedId) throws ConcurrencyFailureException {
-        if (!expectedId.nextVersion().isCompatible(source.getVersionedId())) {
-            String msg = "concurrent modification of event source id '" + source.getVersionedId().getId() + "', type '" + source.getClass().getName() + "'. Actual: " + source.getVersionedId().getVersion() + ", expected: " + expectedId.nextVersion().getVersion();
-            throw new OptimisticLockingFailureException(msg);
-        }
-    }
-    
-    public void storeEventSource(EventSource<? extends E> source) {
-        List<? extends E> unsavedEvents = source.getUnsavedEvents();
-        if (unsavedEvents.isEmpty()) {
-            return;
-        }
-        
-        if (source.getVersionedId().isForInitialVersion()) {
-            insertEventSource(source, unsavedEvents);
-        } else {
-            updateEventSource(source, unsavedEvents);
-        }
-        source.clearUnsavedEvents();
-        source.incrementVersion();
-    }
-
-    private void insertEventSource(EventSource<? extends E> source, List<? extends E> unsavedEvents) {
-        JdbcEventSourceRow eventSourceRow = new JdbcEventSourceRow(source.getVersionedId().getId(), source.getClass());
-        insertEventSourceRow(eventSourceRow, unsavedEvents.size());
-        insertEvents(eventSourceRow, unsavedEvents);
-        if (eventSourceRow.getNextEventSequenceNumber() != unsavedEvents.size()) {
-            throw new IllegalStateException("event sequence mismatch: expected <" + unsavedEvents.size()
-                    + ">, was <" + eventSourceRow.getNextEventSequenceNumber() + ">");
-        }
-    }
-
-    private void insertEventSourceRow(JdbcEventSourceRow eventSourceRow, long initialNextEventSequenceNumber) {
-        jdbcTemplate.update("insert into event_source (id, type, version, next_event_sequence_number) values (?, ?, ?, ?)", 
-                eventSourceRow.getId(), eventSourceRow.getType().getName(), eventSourceRow.getVersion(), initialNextEventSequenceNumber);
-    }
-
-    private void updateEventSource(EventSource<? extends E> source, List<? extends E> unsavedEvents) {
-        JdbcEventSourceRow eventSourceRow = loadEventSourceRow(source.getVersionedId());
-        insertEvents(eventSourceRow, unsavedEvents);
-        updateEventSourceRow(source, eventSourceRow);
-    }
-
-    private JdbcEventSourceRow loadEventSourceRow(VersionedId eventSourceId) {
-        return jdbcTemplate.queryForObject("select id, type, version, next_event_sequence_number from event_source where id = ?", 
-                new JdbcEventSourceRowMapper(),
-                eventSourceId.getId());
-    }
-
-    private void insertEvents(JdbcEventSourceRow eventSourceRow, List<? extends E> changes) {
-        Date changesTimestamp = new Date();
-        for (E event : changes) {
-            insertEvent(eventSourceRow.getId(), eventSourceRow.nextEventSequenceNumber(), changesTimestamp, event);
-        }
-    }
-
-    private void insertEvent(Object eventSourceId, long sequenceNumber, Date changesTimestamp, E event) {
-        jdbcTemplate.update("insert into event (event_source_id, sequence_number, event_timestamp, data) values (?, ?, ?, ?)", eventSourceId,
-                sequenceNumber, changesTimestamp, eventSerializer.serialize(event));
-    }
-
-    private void updateEventSourceRow(EventSource<? extends E> source, JdbcEventSourceRow jdbcEventSource) {
-        long currentVersion = source.getVersionedId().getVersion();
-        long previousVersion = currentVersion - 1;
-        int updateCount = jdbcTemplate.update("update event_source set version = ?, next_event_sequence_number = ? where id = ? and version = ?", 
-                currentVersion, jdbcEventSource.getNextEventSequenceNumber(),
-                jdbcEventSource.getId(), previousVersion);
-        if (updateCount != 1) {
-            long actualVersion = jdbcTemplate.queryForLong("select version from event_source where id = ?", jdbcEventSource.getId());
-            throwConcurrentModificationFailureException(jdbcEventSource, actualVersion, previousVersion);
-        }
-    }
-
-    public <T extends EventSource<? super E>> T loadEventSource(Class<T> type, VersionedId eventSourceId) {
-        try {
-            JdbcEventSourceRow eventSourceRow = loadEventSourceRow(eventSourceId);
-            List<E> history = loadEvents(eventSourceId.getId());
-            T result = instantiateEventSource(type, eventSourceRow, history);
-            verifyVersion(result, eventSourceId);
-            return result;
-        } catch (EmptyResultDataAccessException ex) {
-            return null;
-        }
-    }
-
-    private List<E> loadEvents(Object eventSourceId) {
-        return jdbcTemplate.query("select data from event where event_source_id = ? order by sequence_number", new JdbcEventDeserializerRowMapper(), eventSourceId);
-    }
-
-    private <T extends EventSource<? super E>> T instantiateEventSource(Class<T> expectedType, JdbcEventSourceRow eventSourceRow, List<E> history) {
-        try {
-            VersionedId id = VersionedId.forSpecificVersion(eventSourceRow.getId(), eventSourceRow.getVersion()).nextVersion();
-
-            Constructor<T> constructor = expectedType.getConstructor(VersionedId.class);
-            T result = constructor.newInstance(id);
-            result.loadFromHistory(history);
-            return result;
-        } catch (InstantiationException e) {
-            throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        } catch (SecurityException e) {
-            throw new RuntimeException(e);
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException(e);
-        } catch (InvocationTargetException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void throwConcurrentModificationFailureException(JdbcEventSourceRow jdbcEventSource, long actualVersion, long expectedVersion) {
-        String msg = "concurrent modification of event source id '" + jdbcEventSource.getId() + "', type '" + jdbcEventSource.getType() + "'. Actual: " + actualVersion + ", expected: " + expectedVersion;
-        throw new OptimisticLockingFailureException(msg);
-    }
-
-    private final class JdbcEventDeserializerRowMapper implements ParameterizedRowMapper<E> {
-        public E mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return eventSerializer.deserialize(rs.getObject("data"));
-        }
-    }
-
-    private final static class JdbcEventSourceRowMapper implements ParameterizedRowMapper<JdbcEventSourceRow> {
-        public JdbcEventSourceRow mapRow(ResultSet rs, int rowNum) throws SQLException {
-            try {
-                return new JdbcEventSourceRow(
-                        UUID.fromString(rs.getString("id")), 
-                        Class.forName(rs.getString("type")), 
-                        rs.getLong("version"), 
-                        rs.getLong("next_event_sequence_number"));
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
     
     @PostConstruct 
     void init() {
         try {
             jdbcTemplate.update("drop table event if exists");
-            jdbcTemplate.update("drop table event_source if exists");
-            jdbcTemplate.update("create table event_source(id varchar primary key, type varchar not null, version bigint not null, next_event_sequence_number bigint not null)");
-            jdbcTemplate.update("create table event(event_source_id varchar not null, sequence_number bigint not null, event_timestamp timestamp not null, data varchar not null, " 
-                    + "primary key (event_source_id, sequence_number), foreign key (event_source_id) references event_source (id))");
+            jdbcTemplate.update("drop table event_stream if exists");
+            jdbcTemplate.update("create table event_stream(id varchar primary key, type varchar not null, version bigint not null, timestamp timestamp not null, next_event_sequence bigint not null)");
+            jdbcTemplate.update("create table event(event_stream_id varchar not null, sequence_number bigint not null, version bigint not null, timestamp timestamp not null, data varchar not null, " 
+                    + "primary key (event_stream_id, sequence_number), foreign key (event_stream_id) references event_stream (id))");
         } catch (DataAccessException ex) {
             LOG.info("init database exception", ex);
         }
+    }
+
+    public void createEventStream(UUID streamId, EventSource<E> source) throws DataIntegrityViolationException {
+        long version = source.getVersion();
+        long timestamp = source.getTimestamp();
+        List<? extends E> events = source.getEvents();
+        jdbcTemplate.update("insert into event_stream (id, type, version, timestamp, next_event_sequence) values (?, ?, ?, ?, ?)",
+                streamId.toString(), 
+                source.getType(),
+                version,
+                new Date(timestamp),
+                events.size());
+        saveEvents(streamId, version, timestamp, 0, events);
+    }
+    
+    public void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource<E> source) {
+        long version = source.getVersion();
+        long timestamp = source.getTimestamp();
+        List<? extends E> events = source.getEvents();
+        
+        EventStream stream = getEventStream(streamId);
+        if (version < stream.getVersion()) {
+            throw new IllegalArgumentException("version cannot decrease");
+        }
+        if (timestamp < stream.getTimestamp()) {
+            throw new IllegalArgumentException("timestamp cannot decrease");
+        }
+        
+        int count = jdbcTemplate.update("update event_stream set version = ?, timestamp = ?, next_event_sequence = ? where id = ? and version = ?",
+                version,
+                new Date(timestamp),
+                stream.getNextEventSequence() + events.size(),
+                streamId.toString(), 
+                expectedVersion);
+        if (count != 1) {
+            throw new OptimisticLockingFailureException("id: " + streamId + "; actual: " + stream.getVersion() + "; expected: " + expectedVersion);
+        }
+        
+        saveEvents(streamId, version, timestamp, stream.getNextEventSequence(), events);
+    }
+
+    public void loadEventsFromLatestStreamVersion(final UUID streamId, EventSink<E> sink) {
+        EventStream stream = getEventStream(streamId);
+        List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, stream.getVersion());
+
+        sink.setType(stream.getType());
+        sendEventsToSink(storedEvents, sink);
+    }
+
+    public void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
+        EventStream stream = getEventStream(streamId);
+        if (stream.getVersion() != expectedVersion) {
+            throw new OptimisticLockingFailureException("id: " + streamId + "; actual: " + stream.getVersion() + "; expected: " + expectedVersion);
+        }
+        List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, stream.getVersion());
+
+        sink.setType(stream.getType());
+        sendEventsToSink(storedEvents, sink);
+    }
+
+    public void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) {
+        EventStream stream = getEventStream(streamId);
+        List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, version);
+
+        sink.setType(stream.getType());
+        sendEventsToSink(storedEvents, sink);
+    }
+
+    public void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
+        EventStream stream = getEventStream(streamId);
+        List<StoredEvent<E>> storedEvents = loadEventsUptoTimestamp(stream, timestamp);
+
+        sink.setType(stream.getType());
+        sendEventsToSink(storedEvents, sink);
+    }
+
+    private void saveEvents(UUID streamId, long version, long timestamp, int nextEventSequence, List<? extends E> events) {
+        for (E event : events) {
+            jdbcTemplate.update("insert into event(event_stream_id, sequence_number, version, timestamp, data) values (?, ?, ?, ?, ?)",
+                    streamId.toString(), 
+                    nextEventSequence++,
+                    version,
+                    new Date(timestamp),
+                    eventSerializer.serialize(event));
+        }
+    }
+
+    private EventStream getEventStream(final UUID streamId) {
+        return jdbcTemplate.queryForObject(
+                "select type, version, timestamp, next_event_sequence from event_stream where id = ?", 
+                new EventStreamRowMapper(streamId), 
+                streamId.toString());
+    }
+
+    private List<StoredEvent<E>> loadEventsUptoVersion(EventStream stream, long version) {
+        List<StoredEvent<E>> storedEvents = jdbcTemplate.query(
+                "select version, timestamp, data from event where event_stream_id = ? and version <= ? order by sequence_number", 
+                new StoredEventRowMapper(),
+                stream.getId().toString(), version);
+        if (storedEvents.isEmpty()) {
+            throw new EmptyResultDataAccessException("no events found for stream " + stream.getId() + " for version " + version, 1);
+        }
+        return storedEvents;
+    }
+
+    private List<StoredEvent<E>> loadEventsUptoTimestamp(EventStream stream, long timestamp) {
+        List<StoredEvent<E>> storedEvents = jdbcTemplate.query(
+                "select version, timestamp, data from event where event_stream_id = ? and timestamp <= ? order by sequence_number", 
+                new StoredEventRowMapper(),
+                stream.getId().toString(), new Date(timestamp));
+        if (storedEvents.isEmpty()) {
+            throw new EmptyResultDataAccessException("no events found for stream " + stream.getId() + " for timestamp " + timestamp, 1);
+        }
+        return storedEvents;
+    }
+
+    private void sendEventsToSink(List<StoredEvent<E>> storedEvents, EventSink<E> sink) {
+        List<E> events = new ArrayList<E>(storedEvents.size());
+        for (StoredEvent<E> storedEvent : storedEvents) {
+            events.add(storedEvent.getEvent());
+        }
+        StoredEvent<E> lastEvent = storedEvents.get(storedEvents.size() - 1);
+        sink.setVersion(lastEvent.getVersion());
+        sink.setTimestamp(lastEvent.getTimestamp());
+        sink.setEvents(events);
+    }
+
+    private final class EventStreamRowMapper implements ParameterizedRowMapper<EventStream> {
+        private final UUID streamId;
+
+        private EventStreamRowMapper(UUID streamId) {
+            this.streamId = streamId;
+        }
+
+        public EventStream mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new EventStream(
+                    streamId,
+                    rs.getString("type"),
+                    rs.getLong("version"),
+                    rs.getTimestamp("timestamp").getTime(),
+                    rs.getInt("next_event_sequence"));
+        }
+    }
+
+    private final class StoredEventRowMapper implements ParameterizedRowMapper<StoredEvent<E>> {
+        public StoredEvent<E> mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new StoredEvent<E>(
+                    rs.getLong("version"),
+                    rs.getTimestamp("timestamp").getTime(),
+                    eventSerializer.deserialize(rs.getString("data")));
+        }
+    }
+
+    public static class EventStream {
+        
+        private UUID id;
+        private String type;
+        private long version;
+        private long timestamp;
+        private int nextEventSequence;
+        
+        public EventStream(UUID id, String type, long version, long timestamp, int nextEventSequence) {
+            this.id = id;
+            this.type = type;
+            this.version = version;
+            this.timestamp = timestamp;
+            this.nextEventSequence = nextEventSequence;
+        }
+
+        public UUID getId() {
+            return id;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public long getVersion() {
+            return version;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+        
+        public int getNextEventSequence() {
+            return nextEventSequence;
+        }
+
+    }
+    
+    public static class StoredEvent<E> {
+        
+        private long version;
+        private long timestamp;
+        private E event;
+
+        public StoredEvent(long version, long timestamp, E event) {
+            this.version = version;
+            this.timestamp = timestamp;
+            this.event = event;
+        }
+
+        public long getVersion() {
+            return version;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public E getEvent() {
+            return event;
+        }
+
     }
 
 }

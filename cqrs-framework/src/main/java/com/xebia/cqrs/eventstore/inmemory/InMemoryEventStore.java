@@ -10,28 +10,26 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.stereotype.Component;
 
 import com.xebia.cqrs.eventstore.EventSink;
-import com.xebia.cqrs.eventstore.EventSource2;
-import com.xebia.cqrs.eventstore.EventStore2;
+import com.xebia.cqrs.eventstore.EventSource;
+import com.xebia.cqrs.eventstore.EventStore;
 
 /**
  * Stores and tracks ordered streams of events.
  */
-@Component
-public class InMemoryEventStore<E> implements EventStore2<E> {
+public class InMemoryEventStore<E> implements EventStore<E> {
     
     public Map<UUID, EventStream<E>> eventStreams = new HashMap<UUID, EventStream<E>>();
     
-    public void createEventStream(UUID streamId, EventSource2<E> source) {
+    public void createEventStream(UUID streamId, EventSource<E> source) {
         if (eventStreams.containsKey(streamId)) {
             throw new DataIntegrityViolationException("stream already exists " + streamId);
         }
         eventStreams.put(streamId, new EventStream<E>(source.getType(), source.getVersion(), source.getTimestamp(), source.getEvents()));
     }
     
-    public void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource2<E> source) {
+    public void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource<E> source) {
         EventStream<E> stream = getStream(streamId);
         if (stream.getVersion() != expectedVersion) {
             throw new OptimisticLockingFailureException("stream " + streamId + ", actual version: " + stream.getVersion() + ", expected version: " + expectedVersion);

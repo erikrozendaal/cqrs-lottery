@@ -23,101 +23,12 @@ import com.xebia.cqrs.domain.Event;
 import com.xebia.cqrs.domain.Repository;
 import com.xebia.cqrs.domain.VersionedId;
 import com.xebia.cqrs.eventstore.EventSink;
-import com.xebia.cqrs.eventstore.EventSource2;
-import com.xebia.cqrs.eventstore.EventStore2;
+import com.xebia.cqrs.eventstore.EventSource;
+import com.xebia.cqrs.eventstore.EventStore;
 
-@org.springframework.stereotype.Repository
 public class RepositoryImpl implements Repository, BusSynchronization {
 
-    public static class AggregateRootSource implements EventSource2<Event> {
-
-        private final AggregateRoot aggregateRoot;
-
-        public AggregateRootSource(AggregateRoot aggregateRoot) {
-            this.aggregateRoot = aggregateRoot;
-        }
-
-        public String getType() {
-            return aggregateRoot.getClass().getName();
-        }
-
-        public long getVersion() {
-            return aggregateRoot.getVersionedId().getVersion();
-        }
-
-        public long getTimestamp() {
-            return System.currentTimeMillis();
-        }
-
-        public List<? extends Event> getEvents() {
-            return aggregateRoot.getUnsavedEvents();
-        }
-
-    }
-
-    public static class AggregateRootSink<T extends AggregateRoot> implements EventSink<Event> {
-
-        private final Class<T> expectedType;
-        private final UUID id;
-
-        private Class<? extends T> actualType;
-        private long actualVersion;
-        private T aggregateRoot;
-
-        
-        public AggregateRootSink(Class<T> expectedType, UUID id) {
-            this.expectedType = expectedType;
-            this.id = id;
-        }
-
-        public void setType(String type) {
-            try {
-                actualType = Class.forName(type).asSubclass(expectedType);
-            } catch (ClassNotFoundException ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-
-        public void setVersion(long version) {
-            actualVersion = version + 1;
-        }
-
-        public void setTimestamp(long timestamp) {
-            // TODO Auto-generated method stub
-
-        }
-
-        public void setEvents(Iterable<? extends Event> events) {
-            instantiateAggregateRoot();
-            aggregateRoot.loadFromHistory(events);
-        }
-
-        private void instantiateAggregateRoot() {
-            try {
-                Constructor<? extends T> constructor = actualType.getConstructor(VersionedId.class);
-                aggregateRoot = constructor.newInstance(VersionedId.forSpecificVersion(id, actualVersion));
-            } catch (SecurityException e) {
-                throw new RuntimeException(e);
-            } catch (NoSuchMethodException e) {
-                throw new RuntimeException(e);
-            } catch (IllegalArgumentException e) {
-                throw new RuntimeException(e);
-            } catch (InstantiationException e) {
-                throw new RuntimeException(e);
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException(e);
-            } catch (InvocationTargetException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public T getAggrateRoot() {
-            return aggregateRoot;
-        }
-
-    }
-
-    private final EventStore2<Event> eventStore;
+    private final EventStore<Event> eventStore;
     private final Bus bus;
 
     private final ThreadLocal<Session> sessions = new ThreadLocal<Session>() {
@@ -128,7 +39,7 @@ public class RepositoryImpl implements Repository, BusSynchronization {
     };
     
     @Autowired
-    public RepositoryImpl(EventStore2<Event> eventStore, Bus bus) {
+    public RepositoryImpl(EventStore<Event> eventStore, Bus bus) {
         this.eventStore = eventStore;
         this.bus = bus;
     }
@@ -244,6 +155,94 @@ public class RepositoryImpl implements Repository, BusSynchronization {
 
             // should be done just before transaction commit...
             aggregatesById.clear();
+        }
+
+    }
+
+    public static class AggregateRootSource implements EventSource<Event> {
+
+        private final AggregateRoot aggregateRoot;
+
+        public AggregateRootSource(AggregateRoot aggregateRoot) {
+            this.aggregateRoot = aggregateRoot;
+        }
+
+        public String getType() {
+            return aggregateRoot.getClass().getName();
+        }
+
+        public long getVersion() {
+            return aggregateRoot.getVersionedId().getVersion();
+        }
+
+        public long getTimestamp() {
+            return System.currentTimeMillis();
+        }
+
+        public List<? extends Event> getEvents() {
+            return aggregateRoot.getUnsavedEvents();
+        }
+
+    }
+
+    public static class AggregateRootSink<T extends AggregateRoot> implements EventSink<Event> {
+
+        private final Class<T> expectedType;
+        private final UUID id;
+
+        private Class<? extends T> actualType;
+        private long actualVersion;
+        private T aggregateRoot;
+
+        
+        public AggregateRootSink(Class<T> expectedType, UUID id) {
+            this.expectedType = expectedType;
+            this.id = id;
+        }
+
+        public void setType(String type) {
+            try {
+                actualType = Class.forName(type).asSubclass(expectedType);
+            } catch (ClassNotFoundException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        public void setVersion(long version) {
+            actualVersion = version + 1;
+        }
+
+        public void setTimestamp(long timestamp) {
+            // TODO Auto-generated method stub
+
+        }
+
+        public void setEvents(Iterable<? extends Event> events) {
+            instantiateAggregateRoot();
+            aggregateRoot.loadFromHistory(events);
+        }
+
+        private void instantiateAggregateRoot() {
+            try {
+                Constructor<? extends T> constructor = actualType.getConstructor(VersionedId.class);
+                aggregateRoot = constructor.newInstance(VersionedId.forSpecificVersion(id, actualVersion));
+            } catch (SecurityException e) {
+                throw new RuntimeException(e);
+            } catch (NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException(e);
+            } catch (InstantiationException e) {
+                throw new RuntimeException(e);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            } catch (InvocationTargetException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public T getAggrateRoot() {
+            return aggregateRoot;
         }
 
     }

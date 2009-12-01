@@ -12,7 +12,7 @@ import com.xebia.cqrs.domain.AggregateRootNotFoundException;
 import com.xebia.cqrs.domain.Event;
 import com.xebia.cqrs.domain.FakeAggregateRoot;
 import com.xebia.cqrs.domain.VersionedId;
-import com.xebia.cqrs.eventstore.EventStore2;
+import com.xebia.cqrs.eventstore.EventStore;
 import com.xebia.cqrs.eventstore.inmemory.InMemoryEventStore;
 
 
@@ -22,7 +22,7 @@ public class RepositoryImplTest {
     
     private Bus bus;
     private FakeAggregateRoot aggregateRoot;
-    private EventStore2<Event> eventStore;
+    private EventStore<Event> eventStore;
     private RepositoryImpl subject;
     
     @Before

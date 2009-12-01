@@ -6,6 +6,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -21,9 +22,14 @@ public abstract class AbstractEventStoreTest {
     private static final long T1 = 1000;
     private static final long T2 = 2000;
 
-    private EventStore2<String> subject = createSubject();
+    private EventStore<String> subject;
 
-    protected abstract EventStore2<String> createSubject();
+    protected abstract EventStore<String> createSubject();
+    
+    @Before
+    public void setUp() {
+        subject = createSubject();
+    }
     
     @Test
     public void should_create_event_stream_with_initial_version_and_events() {
@@ -209,7 +215,7 @@ public abstract class AbstractEventStoreTest {
         }
     }
     
-    public static class FakeEventSource2 implements EventSource2<String> {
+    public static class FakeEventSource2 implements EventSource<String> {
 
         private final String type;
         private final long version;

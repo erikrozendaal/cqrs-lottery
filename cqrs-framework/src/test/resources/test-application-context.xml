@@ -17,15 +17,11 @@
 
 <bean id="dataSource" class="org.springframework.jdbc.datasource.SimpleDriverDataSource">
     <property name="driverClass" value="org.hsqldb.jdbcDriver"/>
-    <property name="url" value="jdbc:hsqldb:mem:cqrs_war"/>
+    <property name="url" value="jdbc:hsqldb:mem:cqrs_framework"/>
 </bean>
 
 <bean id="simpleJdbcTemplate" class="org.springframework.jdbc.core.simple.SimpleJdbcTemplate">
     <constructor-arg ref="dataSource"/>
 </bean>
-
-<bean id="eventStore" class="com.xebia.cqrs.eventstore.jdbc.JdbcEventStore"/>
-
-<bean id="repository" class="com.xebia.cqrs.dao.RepositoryImpl"/>
 
 </beans>

@@ -24,4 +24,8 @@
     <constructor-arg ref="dataSource"/>
 </bean>
 
+<bean id="eventStore" class="com.xebia.cqrs.eventstore.jdbc.JdbcEventStore"/>
+
+<bean id="repository" class="com.xebia.cqrs.dao.RepositoryImpl"/>
+
 </beans>

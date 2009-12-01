@@ -5,9 +5,7 @@ import java.util.List;
 
 import org.apache.commons.lang.Validate;
 
-import com.xebia.cqrs.eventstore.EventSource;
-
-public abstract class AggregateRoot implements EventSource<Event> {
+public abstract class AggregateRoot {
 
     private VersionedId id;
     private final List<Event> unsavedEvents;
