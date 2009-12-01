@@ -69,13 +69,6 @@ public class JdbcEventStore<E> implements EventStore<E> {
         List<? extends E> events = source.getEvents();
         
         EventStream stream = getEventStream(streamId);
-        if (version < stream.getVersion()) {
-            throw new IllegalArgumentException("version cannot decrease");
-        }
-        if (timestamp < stream.getTimestamp()) {
-            throw new IllegalArgumentException("timestamp cannot decrease");
-        }
-        
         int count = jdbcTemplate.update("update event_stream set version = ?, timestamp = ?, next_event_sequence = ? where id = ? and version = ?",
                 version,
                 new Date(timestamp),
@@ -84,6 +77,12 @@ public class JdbcEventStore<E> implements EventStore<E> {
                 expectedVersion);
         if (count != 1) {
             throw new OptimisticLockingFailureException("id: " + streamId + "; actual: " + stream.getVersion() + "; expected: " + expectedVersion);
+        }
+        if (version < stream.getVersion()) {
+            throw new IllegalArgumentException("version cannot decrease");
+        }
+        if (timestamp < stream.getTimestamp()) {
+            throw new IllegalArgumentException("timestamp cannot decrease");
         }
         
         saveEvents(streamId, version, timestamp, stream.getNextEventSequence(), events);

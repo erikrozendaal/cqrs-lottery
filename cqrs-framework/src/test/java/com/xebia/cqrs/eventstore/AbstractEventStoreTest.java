@@ -110,6 +110,16 @@ public abstract class AbstractEventStoreTest {
     }
     
     @Test
+    public void should_check_optimistic_locking_error_before_decreasing_version_or_timestamp() {
+        subject.createEventStream(ID_1, new FakeEventSource2("type", 5, T1, asList("foo", "bar")));
+        try {
+            subject.storeEventsIntoStream(ID_1, 4, new FakeEventSource2("type", 3, T2, asList("baz")));
+            fail("OptimisticLockingFailureException expected");
+        } catch (OptimisticLockingFailureException expected) {
+        }
+    }
+    
+    @Test
     public void should_fail_to_store_events_into_stream_when_new_version_is_before_previous_version() {
         subject.createEventStream(ID_1, new FakeEventSource2("type", 5, T1, asList("foo", "bar")));
         try {
