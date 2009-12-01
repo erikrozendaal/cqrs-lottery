@@ -5,10 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,8 +67,6 @@ public class RepositoryImpl implements Repository, BusSynchronization {
     private class Session {
 
         private Map<UUID, AggregateRoot> aggregatesById = new HashMap<UUID, AggregateRoot>();
-        private Queue<AggregateRoot> added = new LinkedList<AggregateRoot>();
-        private Queue<AggregateRoot> loaded = new LinkedList<AggregateRoot>();
 
         public <T extends AggregateRoot> T getById(Class<T> expectedType, UUID id) {
             T result = expectedType.cast(aggregatesById.get(id));
@@ -101,7 +97,6 @@ public class RepositoryImpl implements Repository, BusSynchronization {
                 eventStore.loadEventsFromSpecificStreamVersion(id.getId(), id.getVersion(), sink);
                 result = sink.getAggrateRoot();
                 addToSession(result);
-                loaded.add(result);
                 return result;
             } catch (EmptyResultDataAccessException ex) {
                 throw new AggregateRootNotFoundException(expectedType.getName(), id.getId());
@@ -113,14 +108,13 @@ public class RepositoryImpl implements Repository, BusSynchronization {
                 throw new IllegalArgumentException("aggregate has no unsaved changes");
             }
             addToSession(aggregate);
-            added.add(aggregate);
         }
 
         private <T extends AggregateRoot> void addToSession(T aggregate) {
             AggregateRoot previous = aggregatesById.put(aggregate.getVersionedId().getId(), aggregate);
             if (previous != null && previous != aggregate) {
                 throw new IllegalStateException("multiple instances with same id " + aggregate.getVersionedId().getId());
-            }
+            } 
         }
 
         public void beforeHandleMessage() {
@@ -128,33 +122,30 @@ public class RepositoryImpl implements Repository, BusSynchronization {
         
         public void afterHandleMessage() {
             Collection<Object> notifications = new ArrayList<Object>();
-            for (AggregateRoot aggregate : added) {
+            for (AggregateRoot aggregate : aggregatesById.values()) {
                 notifications.addAll(aggregate.getNotifications());
                 aggregate.clearNotifications();
                 
-                bus.publish(aggregate.getUnsavedEvents());
-                
-                eventStore.createEventStream(aggregate.getVersionedId().getId(), new AggregateRootSource(aggregate));
-                aggregate.incrementVersion();
-                aggregate.clearUnsavedEvents();
-            }
-            for (AggregateRoot aggregate : loaded) {
-                notifications.addAll(aggregate.getNotifications());
-                aggregate.clearNotifications();
-                
-                bus.publish(aggregate.getUnsavedEvents());
-                
-                eventStore.storeEventsIntoStream(aggregate.getVersionedId().getId(), aggregate.getVersionedId().getVersion() - 1, new AggregateRootSource(aggregate));
-                aggregate.incrementVersion();
-                aggregate.clearUnsavedEvents();
+                List<? extends Event> unsavedEvents = aggregate.getUnsavedEvents();
+                if (!unsavedEvents.isEmpty()) {
+                    bus.publish(unsavedEvents);
+                    saveAggregate(aggregate);
+                }
             }
             bus.reply(notifications);
             
-            added.clear();
-            loaded.clear();
-
             // should be done just before transaction commit...
             aggregatesById.clear();
+        }
+
+        private void saveAggregate(AggregateRoot aggregate) {
+            if (aggregate.getVersionedId().isForInitialVersion()) {
+                eventStore.createEventStream(aggregate.getVersionedId().getId(), new AggregateRootSource(aggregate));
+            } else {
+                eventStore.storeEventsIntoStream(aggregate.getVersionedId().getId(), aggregate.getVersionedId().getVersion() - 1, new AggregateRootSource(aggregate));
+            }
+            aggregate.clearUnsavedEvents();
+            aggregate.incrementVersion();
         }
 
     }
@@ -213,8 +204,7 @@ public class RepositoryImpl implements Repository, BusSynchronization {
         }
 
         public void setTimestamp(long timestamp) {
-            // TODO Auto-generated method stub
-
+            // unused
         }
 
         public void setEvents(Iterable<? extends Event> events) {
