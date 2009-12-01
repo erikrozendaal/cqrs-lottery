@@ -9,7 +9,7 @@ import java.util.List;
  */
 public interface EventSource2<T> {
 
-    Class<?> getType();
+    String getType();
 
     long getVersion();
     

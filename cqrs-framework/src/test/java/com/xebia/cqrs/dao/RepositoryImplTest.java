@@ -1,6 +1,5 @@
 package com.xebia.cqrs.dao;
 
-import static java.util.Arrays.*;
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
@@ -12,74 +11,76 @@ import com.xebia.cqrs.bus.Bus;
 import com.xebia.cqrs.domain.AggregateRootNotFoundException;
 import com.xebia.cqrs.domain.Event;
 import com.xebia.cqrs.domain.FakeAggregateRoot;
-import com.xebia.cqrs.domain.GreetingEvent;
 import com.xebia.cqrs.domain.VersionedId;
-import com.xebia.cqrs.eventstore.EventStore;
+import com.xebia.cqrs.eventstore.EventStore2;
+import com.xebia.cqrs.eventstore.inmemory.InMemoryEventStore;
 
 
 public class RepositoryImplTest {
 
-    private static final VersionedId TEST_ID = VersionedId.random().withVersion(2);
+    private static final VersionedId TEST_ID = VersionedId.random();
     
     private Bus bus;
     private FakeAggregateRoot aggregateRoot;
-    private EventStore<Event> eventStore;
+    private EventStore2<Event> eventStore;
     private RepositoryImpl subject;
     
-    @SuppressWarnings("unchecked")
     @Before
     public void setUp() {
-        aggregateRoot = new FakeAggregateRoot(TEST_ID.nextVersion());
-        aggregateRoot.loadFromHistory(asList(
-                new GreetingEvent(TEST_ID, "Hi Erik"),
-                new GreetingEvent(TEST_ID, "Hi Sjors")));
-        eventStore = createNiceMock(EventStore.class);
+        eventStore = new InMemoryEventStore<Event>();
         bus = createNiceMock(Bus.class);
         subject = new RepositoryImpl(eventStore, bus);
+
+        aggregateRoot = new FakeAggregateRoot(TEST_ID);
+        aggregateRoot.greetPerson("Erik");
+        aggregateRoot.greetPerson("Sjors");
+        subject.add(aggregateRoot);
+    }
+    
+    @Test
+    public void shouldFailToAddAggregateWithoutAnyUnsavedChanges() {
+        FakeAggregateRoot a = new FakeAggregateRoot(VersionedId.random());
+        try {
+            subject.add(a);
+            fail("IllegalArgumentException expected");
+        } catch (IllegalArgumentException expected) {
+        }
     }
     
     @Test
     public void shouldFailOnNonExistingAggregateRoot() {
-        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(null);
-        replay(eventStore);
-
+        VersionedId id = VersionedId.random();
         try {
-            subject.get(FakeAggregateRoot.class, TEST_ID);
+            subject.getByVersionedId(FakeAggregateRoot.class, id);
             fail("AggregateRootNotFoundException expected");
         } catch (AggregateRootNotFoundException expected) {
-            verify(eventStore);
             assertEquals(FakeAggregateRoot.class.getName(), expected.getAggregateRootType());
-            assertEquals(TEST_ID.getId(), expected.getAggregateRootId());
+            assertEquals(id.getId(), expected.getAggregateRootId());
         }
     }
     
     @Test
     public void shouldLoadAggregateRootFromEventStore() {
-        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
-        replay(eventStore);
+        subject.afterHandleMessage();
         
-        FakeAggregateRoot result = subject.get(FakeAggregateRoot.class, TEST_ID);
-
-        verify(eventStore);
-        assertSame(aggregateRoot, result);
+        FakeAggregateRoot result = subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID);
+        
+        assertNotNull(result);
+        assertEquals(aggregateRoot.getLastGreeting(), result.getLastGreeting());
     }
     
     @Test
     public void shouldLoadAggregateOnlyOnce() {
-        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
-        replay(eventStore);
-        
-        FakeAggregateRoot a = subject.get(FakeAggregateRoot.class, TEST_ID);
-        FakeAggregateRoot b = subject.get(FakeAggregateRoot.class, TEST_ID);
+        FakeAggregateRoot a = subject.getById(FakeAggregateRoot.class, TEST_ID.getId());
 
-        verify(eventStore);
-        assertSame(a, b);
+        assertSame(aggregateRoot, a);
     }
     
     @Test
     public void shouldRejectDifferentAggregatesWithSameId() {
-        FakeAggregateRoot a = new FakeAggregateRoot(TEST_ID);
+        FakeAggregateRoot a = aggregateRoot;
         FakeAggregateRoot b = new FakeAggregateRoot(TEST_ID);
+        b.greetPerson("Jan");
         
         subject.add(a);
         try {
@@ -91,45 +92,36 @@ public class RepositoryImplTest {
     
     @Test
     public void shouldCheckAggregateVersionOnLoadFromSession() {
-        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
-        eventStore.verifyVersion(aggregateRoot, TEST_ID.withVersion(0)); expectLastCall().andThrow(new OptimisticLockingFailureException("error"));
-        replay(eventStore);
-        
-        subject.get(FakeAggregateRoot.class, TEST_ID);
         try {
-            subject.get(FakeAggregateRoot.class, TEST_ID.withVersion(0));
+            subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID.withVersion(0));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
-        
-        verify(eventStore);
     }
     
     @Test
     public void shouldStoreAddedAggregate() {
         aggregateRoot.greetPerson("Erik");
-
-        eventStore.storeEventSource(same(aggregateRoot)); expectLastCall();
-        replay(eventStore, bus);
+        replay(bus);
         
-        subject.add(aggregateRoot);
         subject.afterHandleMessage();
         
-        verify(eventStore, bus);
+        verify(bus);
     }
     
     @Test
-    public void shouldStoreLoadedAggregate() {
-        expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
-        eventStore.storeEventSource(same(aggregateRoot)); expectLastCall();
-        replay(eventStore, bus);
+    public void shouldStoreLoadedAggregateWithNextVersion() {
+        replay(bus);
+        subject.afterHandleMessage();
 
-        FakeAggregateRoot result = subject.get(FakeAggregateRoot.class, TEST_ID);
-        result.greetPerson("Erik");
-
+        FakeAggregateRoot result = subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID);
+        result.greetPerson("Mark");
         subject.afterHandleMessage();
         
-        verify(eventStore, bus);
+        FakeAggregateRoot loaded = subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID.nextVersion());
+        
+        assertEquals("Hi Mark", loaded.getLastGreeting());
+        verify(bus);
     }
     
     @Test
@@ -137,12 +129,11 @@ public class RepositoryImplTest {
         aggregateRoot.greetPerson("Erik");
 
         bus.publish(eq(aggregateRoot.getUnsavedEvents())); expectLastCall();
-        replay(eventStore, bus);
+        replay(bus);
         
-        subject.add(aggregateRoot);
         subject.afterHandleMessage();
         
-        verify(eventStore, bus);
+        verify(bus);
     }
     
     @Test
@@ -150,12 +141,11 @@ public class RepositoryImplTest {
         aggregateRoot.greetPerson("Erik");
 
         bus.reply(eq(aggregateRoot.getNotifications())); expectLastCall();
-        replay(eventStore, bus);
+        replay(bus);
         
-        subject.add(aggregateRoot);
         subject.afterHandleMessage();
         
-        verify(eventStore, bus);
+        verify(bus);
     }
     
 }

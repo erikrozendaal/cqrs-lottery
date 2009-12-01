@@ -34,7 +34,7 @@ public abstract class AggregateRoot implements EventSource<Event> {
     public VersionedId getVersionedId() {
         return id;
     }
-
+    
     public void loadFromHistory(Iterable<? extends Event> events) {
         for (Event event : events) {
             onEvent(event);

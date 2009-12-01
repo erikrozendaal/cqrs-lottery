@@ -1,10 +1,5 @@
 package com.xebia.cqrs.eventstore;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,163 +9,100 @@ import org.springframework.dao.OptimisticLockingFailureException;
 /**
  * Stores and tracks ordered streams of events.
  */
-public class EventStore2<E> {
-    
-    private Map<UUID, EventStream<E>> eventStreams = new HashMap<UUID, EventStream<E>>();
-    
-    void createEventStream(UUID streamId, EventSource2<E> source) {
-        if (eventStreams.containsKey(streamId)) {
-            throw new DataIntegrityViolationException("stream already exists " + streamId);
-        }
-        eventStreams.put(streamId, new EventStream<E>(source.getType(), source.getVersion(), source.getTimestamp(), source.getEvents()));
-    }
-    
-    void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource2<E> source) {
-        EventStream<E> stream = getStream(streamId);
-        if (stream.getVersion() != expectedVersion) {
-            throw new OptimisticLockingFailureException("stream " + streamId + ", actual version: " + stream.getVersion() + ", expected version: " + expectedVersion);
-        }
-        stream.setVersion(source.getVersion());
-        stream.setTimestamp(source.getTimestamp());
-        stream.addEvents(source.getEvents());
-    }
+public interface EventStore2<E> {
 
-    void loadEventsFromStream(UUID streamId, EventSink<E> sink) {
-        EventStream<E> stream = getStream(streamId);
-        sink.setType(stream.getType());
-        stream.sendEventsAtVersionToSink(stream.getVersion(), sink);
-    }
-    
-    public void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) {
-        EventStream<E> stream = getStream(streamId);
-        sink.setType(stream.getType());
+    /**
+     * Creates a new event stream. The stream is initialized with the data and
+     * events provided by source.
+     * 
+     * @param streamId
+     *            the stream id of the stream to create.
+     * @param source
+     *            provides the type, initial version, initial timestamp, and
+     *            initial events.
+     * @throws DataIntegrityViolationException
+     *             a stream with the specified id already exists.
+     */
+    void createEventStream(UUID streamId, EventSource2<E> source) throws DataIntegrityViolationException;
 
-        long actualVersion = Math.min(stream.getVersion(), version);
-        stream.sendEventsAtVersionToSink(actualVersion, sink);
-    }
-    
-    public void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
-        EventStream<E> stream = getStream(streamId);
-        sink.setType(stream.getType());
+    /**
+     * Adds the events from source to the specified stream.
+     * 
+     * @param streamId
+     *            the stream id.
+     * @param expectedVersion
+     *            the expected version of the stream.
+     * @param source
+     *            the stream data and events source.
+     * @throws EmptyResultDataAccessException
+     *             the specified stream does not exist.
+     * @throws OptimisticLockingFailureException
+     *             thrown when the expected version does not match the actual
+     *             version of the stream.
+     */
+    void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource2<E> source) throws EmptyResultDataAccessException,
+            OptimisticLockingFailureException;
 
-        long actualTimestamp = Math.min(stream.getTimestamp(), timestamp);
-        stream.sendEventsAtTimestampToSink(actualTimestamp, sink);
-    }
+    /**
+     * Loads the events associated with the stream into the provided sink.
+     * 
+     * @param streamId
+     *            the stream id
+     * @param sink
+     *            the sink to send the stream data and events to.
+     * @throws EmptyResultDataAccessException
+     *             no stream with the specified id exists.
+     */
+    void loadEventsFromLatestStreamVersion(UUID streamId, EventSink<E> sink) throws EmptyResultDataAccessException;
 
-    private EventStream<E> getStream(UUID streamId) {
-        EventStream<E> stream = eventStreams.get(streamId);
-        if (stream == null) {
-            throw new EmptyResultDataAccessException("unknown event stream " + streamId, 1);
-        }
-        return stream;
-    }
-    
-    private static class VersionedEvent<E> {
-        private final long version;
-        private final long timestamp;
-        private final E event;
+    /**
+     * Loads the events associated with the stream into the provided sink.
+     * 
+     * @param streamId
+     *            the stream id
+     * @param expectedVersion
+     *            the expected version of the stream.
+     * @param sink
+     *            the sink to send the stream data and events to.
+     * @throws EmptyResultDataAccessException
+     *             no stream with the specified id exists.
+     * @throws OptimisticLockingFailureException
+     *             thrown when the expected version does not match the actual
+     *             version of the stream.
+     */
+    void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) throws EmptyResultDataAccessException,
+            OptimisticLockingFailureException;
 
-        public VersionedEvent(long version, long timestamp, E event) {
-            this.version = version;
-            this.timestamp = timestamp;
-            this.event = event;
-        }
-        
-        public long getVersion() {
-            return version;
-        }
-        
-        public long getTimestamp() {
-            return timestamp;
-        }
-        
-        public E getEvent() {
-            return event;
-        }
-    }
-    
-    private static class EventStream<E> {
-        private final Class<?> type;
-        private long version;
-        private long timestamp;
-        private final List<VersionedEvent<E>> events = new ArrayList<VersionedEvent<E>>();
-        
-        public EventStream(Class<?> type, long version, long timestamp, Collection<? extends E> initialEvents) {
-            this.type = type;
-            this.version = version;
-            this.timestamp = timestamp;
-            addEvents(initialEvents);
-        }
+    /**
+     * Loads the events associated with the stream into the provided sink. Only
+     * the events that existed before and at the requested version are loaded.
+     * 
+     * @param streamId
+     *            the stream id
+     * @param version
+     *            the version of the event stream to load.
+     * @param sink
+     *            the sink to send the stream data and events to.
+     * @throws EmptyResultDataAccessException
+     *             no stream with the specified id exists or the version is
+     *             lower than the initial version of the stream.
+     */
+    void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) throws EmptyResultDataAccessException;
 
-        public void sendEventsAtVersionToSink(long version, EventSink<E> sink) {
-            List<E> result = new ArrayList<E>();
-            VersionedEvent<E> lastEvent = null;
-            for (VersionedEvent<E> event : events) {
-                if (event.getVersion() > version) {
-                    break;
-                }
-                lastEvent = event;
-                result.add(event.getEvent());
-            }
-
-            sendEventsToSink(result, lastEvent, sink);
-        }
-
-        public void sendEventsAtTimestampToSink(long timestamp, EventSink<E> sink) {
-            List<E> result = new ArrayList<E>();
-            VersionedEvent<E> lastEvent = null;
-            for (VersionedEvent<E> event : events) {
-                if (event.getTimestamp() > timestamp) {
-                    break;
-                }
-                lastEvent = event;
-                result.add(event.getEvent());
-            }
-            
-            sendEventsToSink(result, lastEvent, sink);
-        }
-
-        private void sendEventsToSink(List<E> events, VersionedEvent<E> lastEvent, EventSink<E> sink) {
-            if (lastEvent == null) {
-                throw new EmptyResultDataAccessException("no event found for specified version or timestamp", 1);
-            }
-            sink.setVersion(lastEvent.getVersion());
-            sink.setTimestamp(lastEvent.getTimestamp());
-            sink.setEvents(events);
-        }
-
-        public Class<?> getType() {
-            return type;
-        }
-
-        public long getVersion() {
-            return version;
-        }
-
-        public void setVersion(long version) {
-            if (this.version > version) {
-                throw new IllegalArgumentException("version cannot decrease");
-            }
-            this.version = version;
-        }
-        
-        public long getTimestamp() {
-            return timestamp;
-        }
-        
-        public void setTimestamp(long timestamp) {
-            if (this.timestamp > timestamp) {
-                throw new IllegalArgumentException("timestamp cannot decrease");
-            }
-            this.timestamp = timestamp;
-        }
-
-        public void addEvents(Collection<? extends E> eventsToAdd) {
-            for (E event : eventsToAdd) {
-                this.events.add(new VersionedEvent<E>(this.version, this.timestamp, event));
-            }
-        }
-
-    }
+    /**
+     * Loads the events associated with the stream into the provided sink. Only
+     * the events that existed before and at the requested timestamp are loaded.
+     * 
+     * @param streamId
+     *            the stream id
+     * @param timestamp
+     *            the timestamp of the event stream to load.
+     * @param sink
+     *            the sink to send the stream data and events to.
+     * @throws EmptyResultDataAccessException
+     *             no stream with the specified id exists or the version is
+     *             lower than the initial version of the stream.
+     */
+    void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink);
 
 }
