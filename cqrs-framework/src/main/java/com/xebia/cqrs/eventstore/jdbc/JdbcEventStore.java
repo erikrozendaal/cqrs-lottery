@@ -69,15 +69,15 @@ public class JdbcEventStore<E> implements EventStore<E> {
     }
 
     private void updateEventSource(EventSource<? extends E> source, List<? extends E> unsavedEvents) {
-        JdbcEventSourceRow eventSourceRow = loadEventSourceRow(source.getVersionedId());
+        JdbcEventSourceRow eventSourceRow = loadEventSourceRow(source.getVersionedId().getId());
         insertEvents(eventSourceRow, unsavedEvents);
         updateEventSourceRow(source, eventSourceRow);
     }
 
-    private JdbcEventSourceRow loadEventSourceRow(VersionedId eventSourceId) {
+    private JdbcEventSourceRow loadEventSourceRow(UUID eventSourceId) {
         return jdbcTemplate.queryForObject("select id, type, version, next_event_sequence_number from event_source where id = ?", 
                 new JdbcEventSourceRowMapper(),
-                eventSourceId.getId());
+                eventSourceId.toString());
     }
 
     private void insertEvents(JdbcEventSourceRow eventSourceRow, List<? extends E> changes) {
@@ -104,9 +104,20 @@ public class JdbcEventStore<E> implements EventStore<E> {
         }
     }
 
-    public <T extends EventSource<? super E>> T loadEventSource(Class<T> type, VersionedId eventSourceId) {
+    public <T extends EventSource<? super E>> T loadEventSource(Class<T> type, UUID eventSourceId) {
         try {
             JdbcEventSourceRow eventSourceRow = loadEventSourceRow(eventSourceId);
+            List<E> history = loadEvents(eventSourceRow.getId());
+            T result = instantiateEventSource(type, eventSourceRow, history);
+            return result;
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+    
+    public <T extends EventSource<? super E>> T loadEventSource(Class<T> type, VersionedId eventSourceId) {
+        try {
+            JdbcEventSourceRow eventSourceRow = loadEventSourceRow(eventSourceId.getId());
             verifyVersion(eventSourceId.getVersion(), eventSourceRow);
             List<E> history = loadEvents(eventSourceId.getId());
             T result = instantiateEventSource(type, eventSourceRow, history);

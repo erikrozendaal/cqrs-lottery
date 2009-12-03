@@ -1,5 +1,7 @@
 package com.xebia.cqrs.eventstore;
 
+import java.util.UUID;
+
 import org.springframework.dao.ConcurrencyFailureException;
 
 import com.xebia.cqrs.domain.VersionedId;
@@ -15,10 +17,17 @@ public interface EventStore<E> {
     void storeEventSource(EventSource<? extends E> source) throws ConcurrencyFailureException;
 
     /**
-     * Loads all change events for the event source with the specified
+     * Loads all change events for the event source with the specified 
      * <code>eventSourceId</code>.
-     *
-     * @param version the version of the last applied event(s).
+     * 
+     * @return null if no event source of the specified eventSourceId was found.
+     */
+    <T extends EventSource<? super E>> T loadEventSource(Class<T> expectedType, UUID eventSourceId);
+
+    /**
+     * Loads all change events for the event source with the specified versioned
+     * <code>eventSourceId</code>.
+     * 
      * @return null if no event source of the specified eventSourceId was found.
      */
     <T extends EventSource<? super E>> T loadEventSource(Class<T> expectedType, VersionedId eventSourceId);

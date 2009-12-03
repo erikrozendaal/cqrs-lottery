@@ -19,8 +19,8 @@ public class PurchaseLotteryTicketCommandHandler implements Handler<PurchaseTick
     }
 
     public void handleMessage(PurchaseTicketCommand command) {
-        Lottery lottery = repository.get(Lottery.class, command.getLotteryId());
-        Customer customer = repository.get(Customer.class, command.getCustomerId());
+        Lottery lottery = repository.getByVersionedId(Lottery.class, command.getLotteryId());
+        Customer customer = repository.getByVersionedId(Customer.class, command.getCustomerId());
         lottery.purchaseTicketForCustomer(customer);
         repository.save(lottery);
         repository.save(customer);
