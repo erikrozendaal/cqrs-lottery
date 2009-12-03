@@ -1,5 +1,7 @@
 package com.xebia.cqrs.dao;
 
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.xebia.cqrs.bus.Bus;
@@ -26,16 +28,22 @@ public class RepositoryImpl implements Repository {
         this.eventStore = eventStore;
         this.bus = bus;
     }
-
-    public <T extends AggregateRoot> T get(Class<T> type, VersionedId id) {
+    
+    public <T extends AggregateRoot> T getById(Class<T> type, UUID id) {
         T result = eventStore.loadEventSource(type, id);
         verifyExistence(type, id, result);
         return result;
     }
 
-    private void verifyExistence(Class<?> type, VersionedId id, Object result) {
+    public <T extends AggregateRoot> T getByVersionedId(Class<T> type, VersionedId id) {
+        T result = eventStore.loadEventSource(type, id);
+        verifyExistence(type, id.getId(), result);
+        return result;
+    }
+
+    private void verifyExistence(Class<?> type, UUID id, Object result) {
         if (result == null) {
-            throw new AggregateRootNotFoundException(type.getName(), id.getId());
+            throw new AggregateRootNotFoundException(type.getName(), id);
         }
     }
 

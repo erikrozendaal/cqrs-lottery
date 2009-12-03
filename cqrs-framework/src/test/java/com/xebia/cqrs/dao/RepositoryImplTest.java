@@ -43,7 +43,7 @@ public class RepositoryImplTest {
         replay(eventStore);
 
         try {
-            subject.get(FakeAggregateRoot.class, TEST_ID);
+            subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID);
             fail("AggregateRootNotFoundException expected");
         } catch (AggregateRootNotFoundException expected) {
             verify(eventStore);
@@ -57,7 +57,7 @@ public class RepositoryImplTest {
         expect(eventStore.loadEventSource(FakeAggregateRoot.class, TEST_ID)).andReturn(aggregateRoot);
         replay(eventStore);
         
-        FakeAggregateRoot result = subject.get(FakeAggregateRoot.class, TEST_ID);
+        FakeAggregateRoot result = subject.getByVersionedId(FakeAggregateRoot.class, TEST_ID);
 
         verify(eventStore);
         assertSame(aggregateRoot, result);
