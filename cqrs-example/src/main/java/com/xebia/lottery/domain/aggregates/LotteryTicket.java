@@ -1,5 +1,7 @@
 package com.xebia.lottery.domain.aggregates;
 
+import java.util.UUID;
+
 import com.xebia.cqrs.domain.ValueObject;
 
 public class LotteryTicket extends ValueObject {
@@ -8,9 +10,9 @@ public class LotteryTicket extends ValueObject {
 
     private final String number;
 
-    private final Object customerId;
+    private final UUID customerId;
     
-    public LotteryTicket(String number, Object customerId) {
+    public LotteryTicket(String number, UUID customerId) {
         this.number = number;
         this.customerId = customerId;
     }
@@ -19,7 +21,7 @@ public class LotteryTicket extends ValueObject {
         return number;
     }
 
-    public Object getCustomerId() {
+    public UUID getCustomerId() {
         return customerId;
     }
 
