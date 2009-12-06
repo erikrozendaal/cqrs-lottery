@@ -94,7 +94,7 @@ public class RepositoryImpl implements Repository, BusSynchronization {
             
             try {
                 AggregateRootSink<T> sink = new AggregateRootSink<T>(expectedType, id.getId());
-                eventStore.loadEventsFromSpecificStreamVersion(id.getId(), id.getVersion(), sink);
+                eventStore.loadEventsFromExpectedStreamVersion(id.getId(), id.getVersion(), sink);
                 result = sink.getAggrateRoot();
                 addToSession(result);
                 return result;

@@ -33,9 +33,11 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_create_event_stream_with_initial_version_and_events() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        
-        FakeEventSink sink = new FakeEventSink("type", 0, T1, asList("foo", "bar"));
+        List<String> events = asList("foo", "bar");
+        FakeEventSource source = new FakeEventSource("type", 0, T1, events);
+        FakeEventSink sink = new FakeEventSink("type", 0, T1, events);
+
+        subject.createEventStream(ID_1, source);
         subject.loadEventsFromLatestStreamVersion(ID_1, sink);
         
         sink.verify();
@@ -43,9 +45,9 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_fail_to_create_stream_with_duplicate_id() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
         try {
-            subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T2, asList("baz")));
+            subject.createEventStream(ID_1, new FakeEventSource("type", 0, T2, asList("baz")));
             fail("DataIntegrityViolationException expected");
         } catch (DataIntegrityViolationException expected) {
         }
@@ -53,8 +55,8 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_store_events_into_stream() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         FakeEventSink sink = new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz"));
         subject.loadEventsFromLatestStreamVersion(ID_1, sink);
@@ -64,22 +66,22 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_load_events_from_specific_stream_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         FakeEventSink sink = new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz"));
-        subject.loadEventsFromSpecificStreamVersion(ID_1, 1, sink);
+        subject.loadEventsFromExpectedStreamVersion(ID_1, 1, sink);
         
         sink.verify();
     }
     
     @Test
     public void should_fail_to_load_events_from_specific_stream_version_when_expected_version_does_not_match_actual_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         try {
-            subject.loadEventsFromSpecificStreamVersion(ID_1, 0, new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz")));
+            subject.loadEventsFromExpectedStreamVersion(ID_1, 0, new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz")));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
@@ -87,13 +89,13 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_store_separate_event_logs_for_different_event_streams() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.createEventStream(ID_2, new FakeEventSource2("type", 0, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_2, new FakeEventSource("type", 0, T2, asList("baz")));
         
         FakeEventSink sink1 = new FakeEventSink("type", 0, T1, asList("foo", "bar"));
-        subject.loadEventsFromSpecificStreamVersion(ID_1, 0, sink1);
+        subject.loadEventsFromExpectedStreamVersion(ID_1, 0, sink1);
         FakeEventSink sink2 = new FakeEventSink("type", 0, T2, asList("baz"));
-        subject.loadEventsFromSpecificStreamVersion(ID_2, 0, sink2);
+        subject.loadEventsFromExpectedStreamVersion(ID_2, 0, sink2);
         
         sink1.verify();
         sink2.verify();
@@ -101,9 +103,9 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_fail_to_store_events_into_stream_when_versions_do_not_match() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 1, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 1, T1, asList("foo", "bar")));
         try {
-            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
@@ -111,9 +113,9 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_check_optimistic_locking_error_before_decreasing_version_or_timestamp() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 5, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 5, T1, asList("foo", "bar")));
         try {
-            subject.storeEventsIntoStream(ID_1, 4, new FakeEventSource2("type", 3, T2, asList("baz")));
+            subject.storeEventsIntoStream(ID_1, 4, new FakeEventSource("type", 3, T2, asList("baz")));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
@@ -121,9 +123,9 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_fail_to_store_events_into_stream_when_new_version_is_before_previous_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 5, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 5, T1, asList("foo", "bar")));
         try {
-            subject.storeEventsIntoStream(ID_1, 5, new FakeEventSource2("type", 4, T2, asList("baz")));
+            subject.storeEventsIntoStream(ID_1, 5, new FakeEventSource("type", 4, T2, asList("baz")));
             fail("IllegalArgumentException expected");
         } catch (IllegalArgumentException expected) {
         }
@@ -131,9 +133,9 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_fail_to_store_events_into_stream_when_new_timestamp_is_before_previous_timestamp() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T2, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T2, asList("foo", "bar")));
         try {
-            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T1, asList("baz")));
+            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T1, asList("baz")));
             fail("IllegalArgumentException expected");
         } catch (IllegalArgumentException expected) {
         }
@@ -141,11 +143,11 @@ public abstract class AbstractEventStoreTest {
 
     @Test
     public void should_fail_to_load_events_when_event_stream_version_does_not_match() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         try {
-            subject.loadEventsFromSpecificStreamVersion(ID_1, 0, new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz")));
+            subject.loadEventsFromExpectedStreamVersion(ID_1, 0, new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz")));
             fail("OptimisticLockingFailureException expected");
         } catch (OptimisticLockingFailureException expected) {
         }
@@ -155,7 +157,7 @@ public abstract class AbstractEventStoreTest {
     @Test
     public void should_fail_to_store_events_into_non_existing_event_stream() {
         try {
-            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 0, T1, asList("foo")));
+            subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 0, T1, asList("foo")));
             fail("EmptyResultDataAccessException expected");
         } catch (EmptyResultDataAccessException expected) {
         }
@@ -164,7 +166,7 @@ public abstract class AbstractEventStoreTest {
     @Test
     public void should_fail_to_load_events_from_non_existing_event_stream() {
         try {
-            subject.loadEventsFromSpecificStreamVersion(ID_1, 0, new FakeEventSink("type", 0, T1, asList("foo")));
+            subject.loadEventsFromExpectedStreamVersion(ID_1, 0, new FakeEventSink("type", 0, T1, asList("foo")));
             fail("EmptyResultDataAccessException expected");
         } catch (EmptyResultDataAccessException expected) {
         }
@@ -172,31 +174,31 @@ public abstract class AbstractEventStoreTest {
     
     @Test
     public void should_load_events_from_stream_at_specific_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         FakeEventSink sink = new FakeEventSink("type", 0, T1, asList("foo", "bar"));
-        subject.loadEventsFromStreamAtVersion(ID_1, 0, sink);
+        subject.loadEventsFromStreamUptoVersion(ID_1, 0, sink);
         
         sink.verify();
     }
 
     @Test
     public void should_load_all_events_from_stream_when_specified_version_is_higher_than_actual_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         FakeEventSink sink = new FakeEventSink("type", 1, T2, asList("foo", "bar", "baz"));
-        subject.loadEventsFromStreamAtVersion(ID_1, 3, sink);
+        subject.loadEventsFromStreamUptoVersion(ID_1, 3, sink);
         
         sink.verify();
     }
     
     @Test
     public void should_fail_to_load_events_from_stream_when_requested_version_is_before_first_event_version() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 2, T1, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 2, T1, asList("foo", "bar")));
         try {
-            subject.loadEventsFromStreamAtVersion(ID_1, 1, new FakeEventSink("type", 0, T2, asList("foo", "bar")));
+            subject.loadEventsFromStreamUptoVersion(ID_1, 1, new FakeEventSink("type", 0, T2, asList("foo", "bar")));
             fail("EmptyResultDataAccessException expected");
         } catch (EmptyResultDataAccessException expected) {
         }
@@ -206,33 +208,33 @@ public abstract class AbstractEventStoreTest {
     public void should_load_events_from_stream_at_specific_timestamp() {
         long t = T1 + 250;
         
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T1, asList("foo", "bar")));
-        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource2("type", 1, T2, asList("baz")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T1, asList("foo", "bar")));
+        subject.storeEventsIntoStream(ID_1, 0, new FakeEventSource("type", 1, T2, asList("baz")));
         
         FakeEventSink sink = new FakeEventSink("type", 0, T1, asList("foo", "bar"));
-        subject.loadEventsFromStreamAtTimestamp(ID_1, t, sink);
+        subject.loadEventsFromStreamUptoTimestamp(ID_1, t, sink);
         
         sink.verify();
     }
     
     @Test
     public void should_fail_to_load_events_from_stream_when_request_timestamp_is_before_first_event_timestamp() {
-        subject.createEventStream(ID_1, new FakeEventSource2("type", 0, T2, asList("foo", "bar")));
+        subject.createEventStream(ID_1, new FakeEventSource("type", 0, T2, asList("foo", "bar")));
         try {
-            subject.loadEventsFromStreamAtTimestamp(ID_1, T1, new FakeEventSink("type", 0, T1, asList("foo", "bar")));
+            subject.loadEventsFromStreamUptoTimestamp(ID_1, T1, new FakeEventSink("type", 0, T1, asList("foo", "bar")));
             fail("EmptyResultDataAccessException expected");
         } catch (EmptyResultDataAccessException expected) {
         }
     }
     
-    public static class FakeEventSource2 implements EventSource<String> {
+    public static class FakeEventSource implements EventSource<String> {
 
         private final String type;
         private final long version;
         private final long timestamp;
         private final List<String> events;
         
-        public FakeEventSource2(String type, long version, long timestamp, List<String> events) {
+        public FakeEventSource(String type, long version, long timestamp, List<String> events) {
             this.type = type;
             this.version = version;
             this.timestamp = timestamp;

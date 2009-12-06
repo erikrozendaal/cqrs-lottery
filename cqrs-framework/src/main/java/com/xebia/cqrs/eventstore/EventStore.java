@@ -9,7 +9,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 /**
  * Stores and tracks ordered streams of events.
  */
-public interface EventStore<E> {
+public interface EventStore<EventType> {
 
     /**
      * Creates a new event stream. The stream is initialized with the data and
@@ -23,7 +23,7 @@ public interface EventStore<E> {
      * @throws DataIntegrityViolationException
      *             a stream with the specified id already exists.
      */
-    void createEventStream(UUID streamId, EventSource<E> source) throws DataIntegrityViolationException;
+    void createEventStream(UUID streamId, EventSource<EventType> source) throws DataIntegrityViolationException;
 
     /**
      * Adds the events from source to the specified stream.
@@ -40,7 +40,7 @@ public interface EventStore<E> {
      *             thrown when the expected version does not match the actual
      *             version of the stream.
      */
-    void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource<E> source) throws EmptyResultDataAccessException,
+    void storeEventsIntoStream(UUID streamId, long expectedVersion, EventSource<EventType> source) throws EmptyResultDataAccessException,
             OptimisticLockingFailureException;
 
     /**
@@ -53,7 +53,7 @@ public interface EventStore<E> {
      * @throws EmptyResultDataAccessException
      *             no stream with the specified id exists.
      */
-    void loadEventsFromLatestStreamVersion(UUID streamId, EventSink<E> sink) throws EmptyResultDataAccessException;
+    void loadEventsFromLatestStreamVersion(UUID streamId, EventSink<EventType> sink) throws EmptyResultDataAccessException;
 
     /**
      * Loads the events associated with the stream into the provided sink.
@@ -70,7 +70,7 @@ public interface EventStore<E> {
      *             thrown when the expected version does not match the actual
      *             version of the stream.
      */
-    void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) throws EmptyResultDataAccessException,
+    void loadEventsFromExpectedStreamVersion(UUID streamId, long expectedVersion, EventSink<EventType> sink) throws EmptyResultDataAccessException,
             OptimisticLockingFailureException;
 
     /**
@@ -80,14 +80,14 @@ public interface EventStore<E> {
      * @param streamId
      *            the stream id
      * @param version
-     *            the version of the event stream to load.
+     *            the version (inclusive) of the event stream to load.
      * @param sink
      *            the sink to send the stream data and events to.
      * @throws EmptyResultDataAccessException
      *             no stream with the specified id exists or the version is
      *             lower than the initial version of the stream.
      */
-    void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) throws EmptyResultDataAccessException;
+    void loadEventsFromStreamUptoVersion(UUID streamId, long version, EventSink<EventType> sink) throws EmptyResultDataAccessException;
 
     /**
      * Loads the events associated with the stream into the provided sink. Only
@@ -96,13 +96,13 @@ public interface EventStore<E> {
      * @param streamId
      *            the stream id
      * @param timestamp
-     *            the timestamp of the event stream to load.
+     *            the timestamp (inclusive) of the event stream to load.
      * @param sink
      *            the sink to send the stream data and events to.
      * @throws EmptyResultDataAccessException
      *             no stream with the specified id exists or the version is
      *             lower than the initial version of the stream.
      */
-    void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink);
+    void loadEventsFromStreamUptoTimestamp(UUID streamId, long timestamp, EventSink<EventType> sink);
 
 }

@@ -95,7 +95,7 @@ public class JdbcEventStore<E> implements EventStore<E> {
         sendEventsToSink(stream, storedEvents, sink);
     }
 
-    public void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
+    public void loadEventsFromExpectedStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
         EventStream stream = getEventStream(streamId);
         if (stream.getVersion() != expectedVersion) {
             throw new OptimisticLockingFailureException("id: " + streamId + "; actual: " + stream.getVersion() + "; expected: " + expectedVersion);
@@ -105,14 +105,14 @@ public class JdbcEventStore<E> implements EventStore<E> {
         sendEventsToSink(stream, storedEvents, sink);
     }
 
-    public void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) {
+    public void loadEventsFromStreamUptoVersion(UUID streamId, long version, EventSink<E> sink) {
         EventStream stream = getEventStream(streamId);
         List<StoredEvent<E>> storedEvents = loadEventsUptoVersion(stream, version);
 
         sendEventsToSink(stream, storedEvents, sink);
     }
 
-    public void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
+    public void loadEventsFromStreamUptoTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
         EventStream stream = getEventStream(streamId);
         List<StoredEvent<E>> storedEvents = loadEventsUptoTimestamp(stream, timestamp);
 

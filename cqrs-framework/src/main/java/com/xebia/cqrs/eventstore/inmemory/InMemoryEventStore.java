@@ -1,7 +1,6 @@
 package com.xebia.cqrs.eventstore.inmemory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +44,7 @@ public class InMemoryEventStore<E> implements EventStore<E> {
         stream.sendEventsAtVersionToSink(stream.getVersion(), sink);
     }
     
-    public void loadEventsFromSpecificStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
+    public void loadEventsFromExpectedStreamVersion(UUID streamId, long expectedVersion, EventSink<E> sink) {
         EventStream<E> stream = getStream(streamId);
         if (stream.getVersion() != expectedVersion) {
             throw new OptimisticLockingFailureException("stream " + streamId + ", actual version: " + stream.getVersion() + ", expected version: " + expectedVersion);
@@ -54,7 +53,7 @@ public class InMemoryEventStore<E> implements EventStore<E> {
         stream.sendEventsAtVersionToSink(stream.getVersion(), sink);
     }
     
-    public void loadEventsFromStreamAtVersion(UUID streamId, long version, EventSink<E> sink) {
+    public void loadEventsFromStreamUptoVersion(UUID streamId, long version, EventSink<E> sink) {
         EventStream<E> stream = getStream(streamId);
         sink.setType(stream.getType());
 
@@ -62,7 +61,7 @@ public class InMemoryEventStore<E> implements EventStore<E> {
         stream.sendEventsAtVersionToSink(actualVersion, sink);
     }
     
-    public void loadEventsFromStreamAtTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
+    public void loadEventsFromStreamUptoTimestamp(UUID streamId, long timestamp, EventSink<E> sink) {
         EventStream<E> stream = getStream(streamId);
         sink.setType(stream.getType());
 
@@ -108,7 +107,7 @@ public class InMemoryEventStore<E> implements EventStore<E> {
         private long timestamp;
         private final List<VersionedEvent<E>> events = new ArrayList<VersionedEvent<E>>();
         
-        public EventStream(String type, long version, long timestamp, Collection<? extends E> initialEvents) {
+        public EventStream(String type, long version, long timestamp, Iterable<? extends E> initialEvents) {
             this.type = type;
             this.version = version;
             this.timestamp = timestamp;
@@ -178,7 +177,7 @@ public class InMemoryEventStore<E> implements EventStore<E> {
             this.timestamp = timestamp;
         }
 
-        public void addEvents(Collection<? extends E> eventsToAdd) {
+        public void addEvents(Iterable<? extends E> eventsToAdd) {
             for (E event : eventsToAdd) {
                 this.events.add(new VersionedEvent<E>(this.version, this.timestamp, event));
             }

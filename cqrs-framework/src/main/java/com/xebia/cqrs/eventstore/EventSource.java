@@ -7,7 +7,7 @@ import java.util.List;
  * that are stored by the {@link EventStore}. In DDD your aggregates are the
  * event sources.
  */
-public interface EventSource<T> {
+public interface EventSource<EventType> {
 
     String getType();
 
@@ -15,6 +15,6 @@ public interface EventSource<T> {
     
     long getTimestamp();
 
-    List<? extends T> getEvents();
+    List<? extends EventType> getEvents();
 
 }
