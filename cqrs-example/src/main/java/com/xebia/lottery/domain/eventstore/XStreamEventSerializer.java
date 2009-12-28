@@ -1,5 +1,7 @@
 package com.xebia.lottery.domain.eventstore;
 
+import java.util.UUID;
+
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,7 @@ public class XStreamEventSerializer implements EventSerializer<Event> {
     public XStreamEventSerializer() {
         xstream = new XStream();
         xstream.aliasPackage("event", LotteryEvent.class.getPackage().getName());
+        xstream.addImmutableType(UUID.class);
     }
     
     public Event deserialize(Object serialized) {

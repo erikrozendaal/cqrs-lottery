@@ -54,5 +54,5 @@ public class GivenUpcomingLotteryWhenCustomerPurchasesLotteryTicket extends BddT
                 customer,
                 new CustomerBalanceChangedEvent(CUSTOMER_ID, 50, -15, 35));
     }
-
+    
 }

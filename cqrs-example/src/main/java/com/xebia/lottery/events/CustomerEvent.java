@@ -8,7 +8,7 @@ public abstract class CustomerEvent extends Event {
     private static final long serialVersionUID = 1L;
 
     public CustomerEvent(VersionedId customerId) {
-        super(customerId);
+        super(customerId, customerId.getId());
     }
 
     public VersionedId getCustomerId() {

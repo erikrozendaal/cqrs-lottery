@@ -10,7 +10,7 @@ public class LotteryTicketPurchasedEvent extends LotteryEvent {
     private final String ticketNumber;
     
     public LotteryTicketPurchasedEvent(VersionedId lotteryId, VersionedId customerId, String ticketNumber) {
-        super(lotteryId);
+        super(lotteryId, lotteryId.getId());
         this.customerId = customerId;
         this.ticketNumber = ticketNumber;
     }

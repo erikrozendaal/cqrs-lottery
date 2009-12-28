@@ -21,6 +21,7 @@ public class XStreamEventSerializerTest {
                     "    <id>" + LOTTERY_ID.getId() + "</id>\n" +
                     "    <version>" + LOTTERY_ID.getVersion() + "</version>\n" +
                     "  </aggregateRootId>\n" +
+                    "  <entityId class=\"uuid\">" + LOTTERY_ID.getId() + "</entityId>\n" + 
                     "  <customerId>\n" +
                     "    <id>" + CUSTOMER_ID.getId() + "</id>\n" +
                     "    <version>" + CUSTOMER_ID.getVersion() + "</version>\n" +

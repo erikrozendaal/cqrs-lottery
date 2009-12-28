@@ -1,62 +1,41 @@
 package com.xebia.cqrs.domain;
 
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
-import org.apache.commons.lang.Validate;
+public abstract class AggregateRoot extends Entity<UUID> {
 
-public abstract class AggregateRoot {
-
-    private VersionedId id;
-    private final List<Event> unsavedEvents;
-    private final List<Notification> notifications;
-    
-    public AggregateRoot(VersionedId id) {
-        this.id = id;
-        this.unsavedEvents = new ArrayList<Event>();
-        this.notifications = new ArrayList<Notification>();
-    }
-    
-    protected abstract void onEvent(Event event);
-
-    protected void apply(Event event) {
-        onEvent(event);
-        unsavedEvents.add(event);
-    }
-
-    protected void notify(Notification notification) {
-        Validate.notNull(notification, "notification is required");
-        notifications.add(notification);
-    }
-    
-    public VersionedId getVersionedId() {
-        return id;
+    public AggregateRoot(VersionedId versionedId) {
+        super(new Aggregate(versionedId), versionedId.getId());
     }
     
     public void loadFromHistory(Iterable<? extends Event> events) {
-        for (Event event : events) {
-            onEvent(event);
-        }
+        aggregate.loadFromHistory(events);
+    }
+
+    public Collection<? extends Object> getNotifications() {
+        return aggregate.getNotifications();
+    }
+
+    public void clearNotifications() {
+        aggregate.clearNotifications();
     }
 
     public List<? extends Event> getUnsavedEvents() {
-        return new ArrayList<Event>(unsavedEvents);
-    }
-    
-    public void clearUnsavedEvents() {
-        unsavedEvents.clear();
-    }
-    
-    public void incrementVersion() {
-        id = id.nextVersion();
+        return aggregate.getUnsavedEvents();
     }
 
-    public List<Notification> getNotifications() {
-        return new ArrayList<Notification>(notifications);
+    public VersionedId getVersionedId() {
+        return aggregate.getVersionedId();
     }
-    
-    public void clearNotifications() {
-        notifications.clear();
+
+    public void clearUnsavedEvents() {
+        aggregate.clearUnsavedEvents();
+    }
+
+    public void incrementVersion() {
+        aggregate.incrementVersion();
     }
 
 }

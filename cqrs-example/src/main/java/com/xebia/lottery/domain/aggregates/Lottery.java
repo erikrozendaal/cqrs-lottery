@@ -17,6 +17,7 @@ public class Lottery extends AggregateRoot {
     private static final Random RANDOM = new Random(42);
     private final Set<LotteryTicket> tickets = new HashSet<LotteryTicket>();
     private double ticketPrice;
+    private double prizeAmount;
 
     public Lottery(VersionedId id) {
         super(id);
@@ -34,15 +35,19 @@ public class Lottery extends AggregateRoot {
         }
         
         customer.deductBalance(this.ticketPrice);
-        apply(new LotteryTicketPurchasedEvent(getVersionedId(), customer.getVersionedId(), generateTicketNumber()));
+        apply(new LotteryTicketPurchasedEvent(aggregate.getVersionedId(), customer.getVersionedId(), generateTicketNumber()));
     }
 
+    public void draw() {
+        LotteryTicket winningTicket = tickets.iterator().next();
+        winningTicket.win(prizeAmount);
+    }
+    
     private String generateTicketNumber() {
         return String.format("%06d", RANDOM.nextInt(1000000));
     }
 
-    @Override
-    protected void onEvent(Event event) {
+    public void onEvent(Event event) {
         if (event instanceof LotteryCreatedEvent) {
             onLotteryCreatedEvent((LotteryCreatedEvent) event);
         } else if (event instanceof LotteryTicketPurchasedEvent) {
@@ -54,10 +59,11 @@ public class Lottery extends AggregateRoot {
 
     private void onLotteryCreatedEvent(LotteryCreatedEvent event) {
         this.ticketPrice = event.getInfo().getTicketPrice();
+        this.prizeAmount = event.getInfo().getPrizeAmount();
     }
 
     private void onTicketPurchasedEvent(LotteryTicketPurchasedEvent event) {
-        tickets.add(new LotteryTicket(event.getTicketNumber(), event.getCustomerId().getId()));
+        tickets.add(new LotteryTicket(aggregate, event.getTicketNumber(), event.getCustomerId().getId()));
     }
 
 }

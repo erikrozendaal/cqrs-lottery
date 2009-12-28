@@ -7,8 +7,8 @@ public abstract class LotteryEvent extends Event {
 
     private static final long serialVersionUID = 1L;
 
-    public LotteryEvent(VersionedId lotteryId) {
-        super(lotteryId);
+    public LotteryEvent(VersionedId lotteryId, Object entityId) {
+        super(lotteryId, entityId);
     }
     
     public VersionedId getLotteryId() {

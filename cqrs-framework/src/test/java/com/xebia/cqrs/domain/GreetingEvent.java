@@ -2,12 +2,11 @@ package com.xebia.cqrs.domain;
 
 
 public class GreetingEvent extends Event {
-    private static final long serialVersionUID = 1L;
     
     private final String message;
 
     public GreetingEvent(VersionedId aggregateRootId, String message) {
-        super(aggregateRootId);
+        super(aggregateRootId, aggregateRootId.getId());
         this.message = message;
     }
     

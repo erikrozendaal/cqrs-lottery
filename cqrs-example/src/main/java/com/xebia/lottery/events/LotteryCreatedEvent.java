@@ -12,7 +12,7 @@ public class LotteryCreatedEvent extends LotteryEvent {
     private final LotteryInfo info;
 
     public LotteryCreatedEvent(VersionedId lotteryId, LotteryInfo info) {
-        super(lotteryId);
+        super(lotteryId, lotteryId.getId());
         Validate.notNull(info, "info is required");
         this.info = info;
     }
